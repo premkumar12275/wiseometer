@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background-color: #0f1117;
+    color: #e5e7eb;
+    font-family: 'DM Sans', sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #14171f;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2d3a;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3d4a;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-[#1a1d27] border border-[#2a2d3a] rounded-xl;
+  }
+  .btn-primary {
+    @apply bg-teal-400 hover:bg-teal-500 text-navy-900 font-semibold px-4 py-2 rounded-lg transition-colors duration-150 cursor-pointer;
+  }
+  .btn-secondary {
+    @apply bg-[#1f2233] hover:bg-[#252840] text-gray-200 font-medium px-4 py-2 rounded-lg border border-[#2a2d3a] transition-colors duration-150 cursor-pointer;
+  }
+  .btn-danger {
+    @apply bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium px-4 py-2 rounded-lg border border-red-500/20 transition-colors duration-150 cursor-pointer;
+  }
+  .input-field {
+    @apply w-full bg-[#14171f] border border-[#2a2d3a] rounded-lg px-3 py-2 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-teal-400 transition-colors duration-150;
+  }
+  .skeleton {
+    @apply bg-[#1f2233] animate-pulse rounded;
+  }
+  .amount-font {
+    font-family: 'Fira Code', monospace;
+  }
+}
+
+@layer utilities {
+  .fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
