@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATEGORIES, getCategoryById } from '../../constants/categories'
+import { useCategories } from '../../contexts/CategoriesContext'
 import { formatCurrency } from '../../utils/format'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
@@ -18,6 +18,7 @@ const TYPES = [
 const typeColor = (type) => TYPES.find((t) => t.id === type)?.color || 'text-gray-300'
 
 export default function CategoryReview({ rows, onConfirmed }) {
+  const { categories, getCategoryById } = useCategories()
   const [items, setItems] = useState(rows)
 
   const update = (i, patch) =>
@@ -112,7 +113,7 @@ export default function CategoryReview({ rows, onConfirmed }) {
                       disabled={row.excluded}
                       className="bg-transparent text-gray-300 border-none outline-none text-xs cursor-pointer py-0"
                     >
-                      {CATEGORIES.map((c) => (
+                      {categories.map((c) => (
                         <option key={c.id} value={c.id} className="bg-[#1a1d27]">
                           {c.emoji} {c.label}
                         </option>

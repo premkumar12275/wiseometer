@@ -9,7 +9,15 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
 - Auth state managed via `src/hooks/useAuth.js` using Supabase Auth
 - AI features are stubbed in `src/services/aiHooks.js` — do not implement yet
 - PDF and Excel parsing logic lives in `src/components/import/parsers/`
-- Categories are defined once in `src/constants/categories.js` and imported everywhere
+- Built-in categories live in `src/constants/categories.js`; users add custom ones
+  (`categories` table). Components read the merged list + `getCategoryById` from
+  `CategoriesContext` (`useCategories`), never by importing CATEGORIES directly.
+  A transaction's `category` is a built-in slug ('food') or a custom uuid.
+  `categorizeImported`/`autoCategorize` remain keyword-based over built-ins only
+- Groups (spending buckets, e.g. "London Trip") are a `groups` table + nullable
+  `transactions.group_id`. A group is a tag: grouped transactions still count in the
+  monthly dashboard/totals. The group view (TransactionList with a `group` prop) is
+  all-time (month filter skipped when `groupId` is set)
 - Currency formatting and amount parsing live only in `src/utils/format.js`
   (`formatCurrency`, `parseAmount`) — never inline `Intl.NumberFormat`
 - Date-only values from imports are normalized with `toISODate` in

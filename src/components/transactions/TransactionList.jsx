@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTransactions } from '../../hooks/useTransactions'
 import { storageService } from '../../services/storageService'
-import { getCategoryById } from '../../constants/categories'
+import { useCategories } from '../../contexts/CategoriesContext'
 import { formatCurrency } from '../../utils/format'
 import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
-import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download } from 'lucide-react'
+import ImportWizard from '../import/ImportWizard'
+import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
@@ -29,15 +30,14 @@ function exportCSV(transactions) {
   URL.revokeObjectURL(url)
 }
 
-function ConfirmDelete({ count = 1, onConfirm, onCancel }) {
+function ConfirmDelete({ count = 1, title, message, onConfirm, onCancel }) {
+  const heading = title || `Delete ${count > 1 ? `${count} transactions` : 'transaction'}?`
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative card w-full max-w-sm p-6 fade-in">
-        <h3 className="text-base font-semibold text-white mb-2">
-          Delete {count > 1 ? `${count} transactions` : 'transaction'}?
-        </h3>
-        <p className="text-sm text-gray-400 mb-5">This action cannot be undone.</p>
+        <h3 className="text-base font-semibold text-white mb-2">{heading}</h3>
+        <p className="text-sm text-gray-400 mb-5">{message || 'This action cannot be undone.'}</p>
         <div className="flex gap-2">
           <button onClick={onCancel} className="btn-secondary flex-1 text-sm">Cancel</button>
           <button onClick={onConfirm} className="btn-danger flex-1 text-sm">Delete</button>
@@ -48,6 +48,7 @@ function ConfirmDelete({ count = 1, onConfirm, onCancel }) {
 }
 
 function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect }) {
+  const { getCategoryById } = useCategories()
   const cat = getCategoryById(tx.category)
   const isIncome = tx.type === 'income'
   const isTransfer = tx.type === 'transfer'
@@ -96,7 +97,7 @@ function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect }) {
   )
 }
 
-export default function TransactionList({ user, month, year }) {
+export default function TransactionList({ user, month, year, group, groups = [], onDeleteGroup }) {
   const [filters, setFilters] = useState({
     category: 'all',
     type: 'all',
@@ -109,6 +110,10 @@ export default function TransactionList({ user, month, year }) {
   const [editTx, setEditTx] = useState(null)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [pendingDelete, setPendingDelete] = useState(null) // array of ids awaiting confirmation
+  const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [groupSummary, setGroupSummary] = useState(null)
+  const [tick, setTick] = useState(0) // bumped after mutations to refresh the group summary
 
   const { transactions, count, loading, refetch } = useTransactions({
     userId: user.id,
@@ -119,8 +124,15 @@ export default function TransactionList({ user, month, year }) {
     search: filters.search,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
+    groupId: group?.id,
     page,
   })
+
+  // Running totals for the group header (all-time, independent of the page).
+  useEffect(() => {
+    if (!group) { setGroupSummary(null); return }
+    storageService.getGroupSummary(user.id, group.id).then(({ data }) => setGroupSummary(data))
+  }, [group, user.id, tick])
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
@@ -158,12 +170,14 @@ export default function TransactionList({ user, month, year }) {
     else await storageService.deleteTransactions(pendingDelete)
     clearSelection()
     setPendingDelete(null)
+    setTick((t) => t + 1)
     refetch()
   }
 
   const handleSaved = () => {
     setShowForm(false)
     setEditTx(null)
+    setTick((t) => t + 1)
     refetch()
   }
 
@@ -174,6 +188,35 @@ export default function TransactionList({ user, month, year }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4 fade-in">
+      {group && (
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Tag size={18} className="text-teal-400" />
+              <h1 className="text-lg font-semibold text-white">{group.name}</h1>
+            </div>
+            {groupSummary && (
+              <p className="text-xs text-gray-500 mt-1">
+                {groupSummary.count} transaction{groupSummary.count !== 1 ? 's' : ''} · Spent{' '}
+                <span className="text-red-400 amount-font">{formatCurrency(groupSummary.expense)}</span>
+                {groupSummary.income > 0 && (
+                  <> · In <span className="text-green-400 amount-font">{formatCurrency(groupSummary.income)}</span></>
+                )}
+                {groupSummary.transfer > 0 && (
+                  <> · Transfers <span className="text-slate-400 amount-font">{formatCurrency(groupSummary.transfer)}</span></>
+                )}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setConfirmGroupDelete(true)}
+            className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 text-red-400 hover:text-red-300"
+          >
+            <Trash2 size={13} /> Delete group
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
           {loading ? '—' : `${count} transaction${count !== 1 ? 's' : ''}`}
@@ -186,6 +229,14 @@ export default function TransactionList({ user, month, year }) {
           >
             <Download size={14} /> Export CSV
           </button>
+          {group && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="btn-secondary flex items-center gap-2 text-sm py-1.5"
+            >
+              <Upload size={14} /> Import
+            </button>
+          )}
           <button
             onClick={() => { setEditTx(null); setShowForm(true) }}
             className="btn-primary flex items-center gap-2 text-sm py-1.5"
@@ -283,6 +334,8 @@ export default function TransactionList({ user, month, year }) {
         <TransactionForm
           user={user}
           transaction={editTx}
+          groups={groups}
+          defaultGroupId={group?.id}
           onSaved={handleSaved}
           onClose={() => { setShowForm(false); setEditTx(null) }}
         />
@@ -294,6 +347,27 @@ export default function TransactionList({ user, month, year }) {
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}
         />
+      )}
+
+      {confirmGroupDelete && group && (
+        <ConfirmDelete
+          title={`Delete group "${group.name}"?`}
+          message="The group is removed. Its transactions are kept but no longer grouped."
+          onConfirm={() => { setConfirmGroupDelete(false); onDeleteGroup?.(group.id) }}
+          onCancel={() => setConfirmGroupDelete(false)}
+        />
+      )}
+
+      {showImport && group && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0f1117]/95 backdrop-blur-sm fade-in">
+          <ImportWizard
+            user={user}
+            groupId={group.id}
+            groupName={group.name}
+            onClose={() => setShowImport(false)}
+            onImported={() => { setShowImport(false); setTick((t) => t + 1); refetch() }}
+          />
+        </div>
       )}
     </div>
   )

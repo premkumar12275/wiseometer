@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useAuth } from './hooks/useAuth'
+import { useGroups } from './hooks/useGroups'
+import { CategoriesProvider } from './contexts/CategoriesContext'
 import AuthGate from './components/auth/AuthGate'
 import Sidebar from './components/layout/Sidebar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './components/dashboard/Dashboard'
 import TransactionList from './components/transactions/TransactionList'
 import ImportWizard from './components/import/ImportWizard'
+import CategoriesManager from './components/categories/CategoriesManager'
 
 function LoadingScreen() {
   return (
@@ -17,7 +20,9 @@ function LoadingScreen() {
 
 export default function App() {
   const { user, loading } = useAuth()
+  const { groups, createGroup, deleteGroup } = useGroups(user?.id)
   const [page, setPage] = useState('dashboard')
+  const [activeGroupId, setActiveGroupId] = useState(null)
 
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -25,14 +30,35 @@ export default function App() {
 
   if (loading) return <LoadingScreen />
 
+  // Kept fresh from the list so a rename/refresh flows through.
+  const activeGroup = groups.find((g) => g.id === activeGroupId)
+
+  const goToPage = (id) => { setActiveGroupId(null); setPage(id) }
+  const selectGroup = (g) => { setActiveGroupId(g.id); setPage('group') }
+  const handleDeleteGroup = async (id) => {
+    await deleteGroup(id)
+    setActiveGroupId(null)
+    setPage('transactions')
+  }
+
   return (
     <AuthGate user={user}>
+      <CategoriesProvider userId={user.id}>
       <div className="flex h-screen overflow-hidden">
-        <Sidebar currentPage={page} onNavigate={setPage} user={user} />
+        <Sidebar
+          currentPage={page}
+          activeGroupId={activeGroupId}
+          onNavigate={goToPage}
+          onSelectGroup={selectGroup}
+          groups={groups}
+          onCreateGroup={createGroup}
+          user={user}
+        />
 
         <div className="flex flex-col flex-1 overflow-hidden">
           <TopBar
             currentPage={page}
+            title={page === 'group' ? activeGroup?.name : undefined}
             month={month}
             year={year}
             onMonthChange={(m, y) => { setMonth(m); setYear(y) }}
@@ -44,7 +70,7 @@ export default function App() {
                 user={user}
                 month={month}
                 year={year}
-                onNavigate={setPage}
+                onNavigate={goToPage}
               />
             )}
             {page === 'transactions' && (
@@ -52,6 +78,18 @@ export default function App() {
                 user={user}
                 month={month}
                 year={year}
+                groups={groups}
+              />
+            )}
+            {page === 'group' && activeGroup && (
+              <TransactionList
+                key={activeGroup.id}
+                user={user}
+                month={month}
+                year={year}
+                group={activeGroup}
+                groups={groups}
+                onDeleteGroup={handleDeleteGroup}
               />
             )}
             {page === 'import' && (
@@ -63,9 +101,11 @@ export default function App() {
                 }}
               />
             )}
+            {page === 'categories' && <CategoriesManager />}
           </main>
         </div>
       </div>
+      </CategoriesProvider>
     </AuthGate>
   )
 }

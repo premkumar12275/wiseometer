@@ -1,9 +1,9 @@
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { CATEGORIES, getCategoryById } from '../../constants/categories'
+import { useCategories } from '../../contexts/CategoriesContext'
 import { formatCurrency } from '../../utils/format'
 import { PieChart as PieIcon } from 'lucide-react'
 
-const CustomTooltip = ({ active, payload }) => {
+const CustomTooltip = ({ active, payload, getCategoryById }) => {
   if (active && payload && payload.length) {
     const cat = getCategoryById(payload[0].name)
     return (
@@ -21,6 +21,7 @@ const CustomTooltip = ({ active, payload }) => {
 }
 
 export default function SpendingChart({ summary, loading }) {
+  const { getCategoryById } = useCategories()
   const data = summary?.byCategory
     ? Object.entries(summary.byCategory).map(([id, value]) => {
         const cat = getCategoryById(id)
@@ -65,7 +66,7 @@ export default function SpendingChart({ summary, loading }) {
                   <Cell key={entry.name} fill={entry.color} opacity={0.85} />
                 ))}
               </Pie>
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip getCategoryById={getCategoryById} />} />
               <Legend
                 formatter={(value) => {
                   const cat = getCategoryById(value)

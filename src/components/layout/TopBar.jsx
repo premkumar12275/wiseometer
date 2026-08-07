@@ -9,9 +9,10 @@ const PAGE_TITLES = {
   dashboard: 'Dashboard',
   transactions: 'Transactions',
   import: 'Import Statement',
+  categories: 'Categories',
 }
 
-export default function TopBar({ currentPage, month, year, onMonthChange }) {
+export default function TopBar({ currentPage, title, month, year, onMonthChange }) {
   const goBack = () => {
     if (month === 1) onMonthChange(12, year - 1)
     else onMonthChange(month - 1, year)
@@ -26,7 +27,7 @@ export default function TopBar({ currentPage, month, year, onMonthChange }) {
 
   return (
     <header className="h-14 bg-[#14171f] border-b border-[#2a2d3a] flex items-center px-6 gap-4 flex-shrink-0">
-      <h1 className="text-base font-semibold text-white flex-1">{PAGE_TITLES[currentPage] || ''}</h1>
+      <h1 className="text-base font-semibold text-white flex-1">{title || PAGE_TITLES[currentPage] || ''}</h1>
 
       {/* Month picker — only show on dashboard + transactions */}
       {(currentPage === 'dashboard' || currentPage === 'transactions') && (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CATEGORIES } from '../../constants/categories'
+import { useCategories } from '../../contexts/CategoriesContext'
 import { storageService } from '../../services/storageService'
 import { X } from 'lucide-react'
 
@@ -12,9 +12,11 @@ const EMPTY = {
   type: 'expense',
   category: 'other',
   account: 'Main',
+  group_id: '',
 }
 
-export default function TransactionForm({ user, transaction, onSaved, onClose }) {
+export default function TransactionForm({ user, transaction, groups = [], defaultGroupId, onSaved, onClose }) {
+  const { categories } = useCategories()
   const [form, setForm] = useState(transaction ? {
     date: transaction.date,
     description: transaction.description || '',
@@ -22,7 +24,8 @@ export default function TransactionForm({ user, transaction, onSaved, onClose })
     type: transaction.type,
     category: transaction.category,
     account: transaction.account || 'Main',
-  } : EMPTY)
+    group_id: transaction.group_id || '',
+  } : { ...EMPTY, group_id: defaultGroupId || '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -46,6 +49,7 @@ export default function TransactionForm({ user, transaction, onSaved, onClose })
       type: form.type,
       category: form.category,
       account: form.account || 'Main',
+      group_id: form.group_id || null,
     }
 
     let result
@@ -150,7 +154,7 @@ export default function TransactionForm({ user, transaction, onSaved, onClose })
               value={form.category}
               onChange={(e) => set('category', e.target.value)}
             >
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.emoji} {c.label}
                 </option>
@@ -169,6 +173,23 @@ export default function TransactionForm({ user, transaction, onSaved, onClose })
               onChange={(e) => set('account', e.target.value)}
             />
           </div>
+
+          {/* Group */}
+          {groups.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Group</label>
+              <select
+                className="input-field"
+                value={form.group_id}
+                onChange={(e) => set('group_id', e.target.value)}
+              >
+                <option value="">None</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && (
             <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">

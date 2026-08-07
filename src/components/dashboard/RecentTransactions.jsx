@@ -1,8 +1,9 @@
-import { getCategoryById } from '../../constants/categories'
+import { useCategories } from '../../contexts/CategoriesContext'
 import { formatCurrency } from '../../utils/format'
 import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, Receipt } from 'lucide-react'
 
 function TransactionRow({ tx, onEdit }) {
+  const { getCategoryById } = useCategories()
   const cat = getCategoryById(tx.category)
   const isIncome = tx.type === 'income'
   const isTransfer = tx.type === 'transfer'

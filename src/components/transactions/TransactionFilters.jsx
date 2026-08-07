@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { CATEGORIES } from '../../constants/categories'
+import { useCategories } from '../../contexts/CategoriesContext'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 
 export default function TransactionFilters({ filters, onChange }) {
+  const { categories } = useCategories()
   const [open, setOpen] = useState(false)
 
   const set = (key, value) => onChange({ ...filters, [key]: value })
@@ -62,7 +63,7 @@ export default function TransactionFilters({ filters, onChange }) {
               className="input-field text-sm py-1.5"
             >
               <option value="all">All categories</option>
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.emoji} {c.label}
                 </option>

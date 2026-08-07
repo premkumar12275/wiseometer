@@ -8,7 +8,7 @@ import { toISODate } from '../../utils/date'
 import UploadStep from './UploadStep'
 import ColumnMapper from './ColumnMapper'
 import CategoryReview from './CategoryReview'
-import { CheckCircle2, AlertCircle, Loader2, Upload } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Loader2, Upload, X } from 'lucide-react'
 
 const STEPS = ['Upload', 'Map Columns', 'Review', 'Complete']
 
@@ -41,7 +41,7 @@ function StepIndicator({ current }) {
   )
 }
 
-export default function ImportWizard({ user, onImported }) {
+export default function ImportWizard({ user, onImported, groupId, groupName, onClose }) {
   const [step, setStep] = useState(0)
   const [file, setFile] = useState(null)
   const [isPdf, setIsPdf] = useState(false)
@@ -110,6 +110,7 @@ export default function ImportWizard({ user, onImported }) {
       type: r.type || 'expense',
       category: r.category,
       account: 'Import',
+      group_id: groupId || null,
       source: 'import',
       import_file: file?.name || null,
     }))
@@ -154,6 +155,20 @@ export default function ImportWizard({ user, onImported }) {
   return (
     <div className="flex-1 overflow-y-auto p-6 fade-in">
       <div className={`${wide ? 'max-w-5xl' : 'max-w-2xl'} mx-auto transition-[max-width] duration-200`}>
+        {onClose && (
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold text-white">
+              Import into <span className="text-teal-400">{groupName}</span>
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
+              aria-label="Close import"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
         <StepIndicator current={step} />
 
         {parseError && (
