@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from './hooks/useAuth'
+import { useProfile } from './hooks/useProfile'
 import { useGroups } from './hooks/useGroups'
 import { CategoriesProvider } from './contexts/CategoriesContext'
 import AuthGate from './components/auth/AuthGate'
+import ProfileSetup from './components/auth/ProfileSetup'
+import ResetPassword from './components/auth/ResetPassword'
 import Sidebar from './components/layout/Sidebar'
 import TopBar from './components/layout/TopBar'
 import Dashboard from './components/dashboard/Dashboard'
@@ -19,7 +22,8 @@ function LoadingScreen() {
 }
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, recovery, clearRecovery } = useAuth()
+  const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(user)
   const { groups, createGroup, deleteGroup } = useGroups(user?.id)
   const [page, setPage] = useState('dashboard')
   const [activeGroupId, setActiveGroupId] = useState(null)
@@ -28,7 +32,11 @@ export default function App() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
 
+  if (recovery) return <ResetPassword onDone={clearRecovery} />
   if (loading) return <LoadingScreen />
+  if (!user) return <AuthGate user={null} />
+  if (profileLoading) return <LoadingScreen />
+  if (!profile) return <ProfileSetup user={user} onDone={refetchProfile} />
 
   // Kept fresh from the list so a rename/refresh flows through.
   const activeGroup = groups.find((g) => g.id === activeGroupId)
@@ -42,8 +50,7 @@ export default function App() {
   }
 
   return (
-    <AuthGate user={user}>
-      <CategoriesProvider userId={user.id}>
+    <CategoriesProvider userId={user.id}>
       <div className="flex h-screen overflow-hidden">
         <Sidebar
           currentPage={page}
@@ -105,7 +112,6 @@ export default function App() {
           </main>
         </div>
       </div>
-      </CategoriesProvider>
-    </AuthGate>
+    </CategoriesProvider>
   )
 }

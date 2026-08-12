@@ -1,3 +1,49 @@
+-- Profiles: a unique username + display name per auth user (used for sharing).
+create extension if not exists citext;
+
+create table profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  username citext unique not null,
+  name text not null,
+  email text not null,
+  created_at timestamptz default now(),
+  constraint username_format check ((username::text) ~ '^[a-z0-9_]{3,20}$')
+);
+
+alter table profiles enable row level security;
+create policy "own profile read" on profiles
+  for select using (id = auth.uid());
+create policy "own profile write" on profiles
+  for all using (id = auth.uid()) with check (id = auth.uid());
+
+create or replace function username_available(u text)
+returns boolean language sql security definer stable as $$
+  select not exists (select 1 from profiles where username = lower(u));
+$$;
+grant execute on function username_available(text) to anon, authenticated;
+
+create or replace function handle_new_user()
+returns trigger language plpgsql security definer as $$
+begin
+  if new.raw_user_meta_data ? 'username' then
+    insert into public.profiles (id, username, name, email)
+    values (
+      new.id,
+      lower(new.raw_user_meta_data ->> 'username'),
+      coalesce(nullif(new.raw_user_meta_data ->> 'name', ''), new.raw_user_meta_data ->> 'username'),
+      new.email
+    )
+    on conflict (id) do nothing;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
 -- Groups (spending buckets, e.g. "London Trip"). A transaction may optionally
 -- belong to one group; grouped transactions still count in the normal totals.
 create table groups (

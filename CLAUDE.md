@@ -6,7 +6,12 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
 
 ## Architecture Decisions
 - All Supabase interaction goes through `src/services/storageService.js` only
+  (auth calls live in `src/services/authService.js`)
 - Auth state managed via `src/hooks/useAuth.js` using Supabase Auth
+- Every user has a `profiles` row (unique username + name); signup passes
+  username/name as auth metadata → a DB trigger creates the profile. Existing
+  users without a profile are routed to `ProfileSetup`. App.jsx gates:
+  loading → AuthGate (no user) → ProfileSetup (no profile) → app
 - AI features are stubbed in `src/services/aiHooks.js` — do not implement yet
 - PDF and Excel parsing logic lives in `src/components/import/parsers/`
 - Built-in categories live in `src/constants/categories.js`; users add custom ones
