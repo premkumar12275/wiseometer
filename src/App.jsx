@@ -41,6 +41,7 @@ function Workspace({ user, profile }) {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
+  const [viewMode, setViewMode] = useState('month')
 
   const activeGroup = groups.find((g) => g.id === activeGroupId)
 
@@ -75,12 +76,14 @@ function Workspace({ user, profile }) {
             title={page === 'group' ? activeGroup?.name : undefined}
             month={month}
             year={year}
+            viewMode={viewMode}
             onMonthChange={(m, y) => { setMonth(m); setYear(y) }}
+            onViewModeChange={setViewMode}
           />
 
           <main className="flex-1 overflow-hidden flex flex-col">
             {page === 'dashboard' && (
-              <Dashboard key={ownerId} user={user} ownerId={ownerId} canWrite={canWrite} month={month} year={year} onNavigate={goToPage} />
+              <Dashboard key={ownerId} user={user} ownerId={ownerId} canWrite={canWrite} month={month} year={year} viewMode={viewMode} onNavigate={goToPage} />
             )}
             {page === 'transactions' && (
               <TransactionList

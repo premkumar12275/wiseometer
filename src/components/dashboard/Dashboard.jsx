@@ -3,11 +3,12 @@ import { storageService } from '../../services/storageService'
 import SummaryCards from './SummaryCards'
 import SpendingChart from './SpendingChart'
 import DailyTrend from './DailyTrend'
+import MonthlyTrend from './MonthlyTrend'
 import RecentTransactions from './RecentTransactions'
 import TransactionForm from '../transactions/TransactionForm'
 import { Plus } from 'lucide-react'
 
-export default function Dashboard({ user, ownerId, canWrite = true, month, year, onNavigate }) {
+export default function Dashboard({ user, ownerId, canWrite = true, month, year, viewMode = 'month', onNavigate }) {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -15,14 +16,16 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
 
   const fetchSummary = async () => {
     setLoading(true)
-    const { data } = await storageService.getMonthlySummary(ownerId, month, year)
+    const { data } = viewMode === 'year'
+      ? await storageService.getYearlySummary(ownerId, year)
+      : await storageService.getMonthlySummary(ownerId, month, year)
     setSummary(data)
     setLoading(false)
   }
 
   useEffect(() => {
     fetchSummary()
-  }, [ownerId, month, year])
+  }, [ownerId, month, year, viewMode])
 
   const handleSaved = () => {
     setShowForm(false)
@@ -53,7 +56,9 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SpendingChart summary={summary} loading={loading} />
-        <DailyTrend summary={summary} month={month} year={year} loading={loading} />
+        {viewMode === 'year'
+          ? <MonthlyTrend summary={summary} year={year} loading={loading} />
+          : <DailyTrend summary={summary} month={month} year={year} loading={loading} />}
       </div>
 
       <RecentTransactions

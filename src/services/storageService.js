@@ -73,6 +73,25 @@ export const storageService = {
     }
   },
 
+  getAllTransactionsForYear: async ({ userId, year }) => {
+    try {
+      const from = `${year}-01-01`
+      const to = `${year}-12-31`
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('date', from)
+        .lte('date', to)
+        .order('date', { ascending: true })
+
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
   saveTransaction: async (tx) => {
     try {
       const { data, error } = await supabase
@@ -469,6 +488,43 @@ export const storageService = {
 
       return {
         data: { income, expenses, net: income - expenses, byCategory, byDay, transactions: data },
+        error: null,
+      }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  getYearlySummary: async (userId, year) => {
+    try {
+      const { data, error } = await storageService.getAllTransactionsForYear({ userId, year })
+      if (error || !data) return { data: null, error }
+
+      const income = data
+        .filter((t) => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+
+      const expenses = data
+        .filter((t) => t.type === 'expense')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+
+      const byCategory = data
+        .filter((t) => t.type === 'expense')
+        .reduce((acc, t) => {
+          acc[t.category] = (acc[t.category] || 0) + parseFloat(t.amount)
+          return acc
+        }, {})
+
+      const byMonth = data
+        .filter((t) => t.type === 'expense')
+        .reduce((acc, t) => {
+          const monthKey = t.date.slice(5, 7)
+          acc[monthKey] = (acc[monthKey] || 0) + parseFloat(t.amount)
+          return acc
+        }, {})
+
+      return {
+        data: { income, expenses, net: income - expenses, byCategory, byMonth, transactions: data },
         error: null,
       }
     } catch (err) {
