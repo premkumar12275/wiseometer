@@ -12,12 +12,14 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
   username/name as auth metadata → a DB trigger creates the profile. Existing
   users without a profile are routed to `ProfileSetup`. App.jsx gates:
   loading → AuthGate (no user) → ProfileSetup (no profile) → app
-- Group sharing: a group can be shared (by username/email, viewer|editor) via
-  `group_shares`. RLS on transactions/groups/categories uses SECURITY DEFINER
-  helpers (`can_read/write_group`, etc.); `getGroups()`/group queries rely on RLS
-  (no `user_id` filter). useGroups annotates each group with `access`. Editors'
-  inserts are attributed to the group owner (`ownerId`). Full design + Phase 2/3
-  (account sharing) in `docs/sharing-design.md`
+- Sharing (group + account): shares (by username/email, viewer|editor) live in
+  `group_shares` / `account_shares`. RLS on transactions/groups/categories/imports
+  routes through SECURITY DEFINER helpers (`can_read/write_account`,
+  `can_read/write_group`, …). `AccountContext` holds the "active account" (own or
+  one shared with you); every owner-scoped query uses `activeAccount.ownerId` (not
+  `user.id`) and writes are gated on `canWrite`. Switcher lives in the sidebar
+  footer. useGroups annotates each group with `access`. Full design +
+  Phase 3 (management/polish) in `docs/sharing-design.md`
 - AI features are stubbed in `src/services/aiHooks.js` — do not implement yet
 - PDF and Excel parsing logic lives in `src/components/import/parsers/`
 - Built-in categories live in `src/constants/categories.js`; users add custom ones

@@ -104,10 +104,9 @@ create table statement_imports (
 );
 
 alter table statement_imports enable row level security;
-create policy "own imports" on statement_imports
-  for all using (auth.uid() = user_id);
+-- Policies for statement_imports are defined in the "Sharing" section below.
 
--- ── Sharing (Phase 1: group sharing) ─────────────────────────────────────────
+-- ── Sharing (group + account) ────────────────────────────────────────────────
 -- See docs/sharing-design.md. Account-level sharing (Phase 2) will replace the
 -- can_*_account bodies and add account_shares.
 
@@ -131,6 +130,33 @@ create index group_shares_group      on group_shares (group_id);
 create index group_shares_invitee_id on group_shares (invitee_id);
 create index group_shares_invitee_em on group_shares (invitee_email);
 
+-- Whole-account share (Phase 2).
+create table account_shares (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid references auth.users(id) on delete cascade,
+  owner_username citext,
+  owner_name text,
+  owner_email text,
+  invitee_id uuid references auth.users(id) on delete cascade,
+  invitee_username citext,
+  invitee_name text,
+  invitee_email text,
+  role text check (role in ('viewer','editor')) not null default 'viewer',
+  created_at timestamptz default now(),
+  check (invitee_id is not null or invitee_email is not null),
+  unique (owner_id, invitee_id),
+  unique (owner_id, invitee_email)
+);
+create index account_shares_owner      on account_shares (owner_id);
+create index account_shares_invitee_id on account_shares (invitee_id);
+create index account_shares_invitee_em on account_shares (invitee_email);
+
+alter table account_shares enable row level security;
+create policy acc_share_owner on account_shares for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy acc_share_invitee_read on account_shares for select
+  using (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email');
+
 create or replace function find_user(identifier text)
 returns table (id uuid, username citext, name text, email text)
 language sql security definer stable as $$
@@ -141,10 +167,20 @@ $$;
 grant execute on function find_user(text) to authenticated;
 
 create or replace function can_read_account(p_owner uuid)
-returns boolean language sql security definer stable as $$ select p_owner = auth.uid(); $$;
+returns boolean language sql security definer stable as $$
+  select p_owner = auth.uid()
+      or exists (select 1 from account_shares
+                 where owner_id = p_owner
+                   and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
+$$;
 
 create or replace function can_write_account(p_owner uuid)
-returns boolean language sql security definer stable as $$ select p_owner = auth.uid(); $$;
+returns boolean language sql security definer stable as $$
+  select p_owner = auth.uid()
+      or exists (select 1 from account_shares
+                 where owner_id = p_owner and role = 'editor'
+                   and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
+$$;
 
 create or replace function group_owner(p_group uuid)
 returns uuid language sql security definer stable as $$ select user_id from groups where id = p_group; $$;
@@ -188,6 +224,9 @@ begin
   update group_shares
      set invitee_id = new.id, invitee_username = new.username, invitee_name = new.name
    where invitee_id is null and lower(invitee_email) = lower(new.email);
+  update account_shares
+     set invitee_id = new.id, invitee_username = new.username, invitee_name = new.name
+   where invitee_id is null and lower(invitee_email) = lower(new.email);
   return new;
 end;
 $$;
@@ -222,4 +261,9 @@ create policy cat_select on categories for select using (
   can_read_account(user_id) or shares_group_of_owner(user_id)
 );
 create policy cat_write on categories for all
+  using (can_write_account(user_id)) with check (can_write_account(user_id));
+
+-- statement_imports (account-scoped)
+create policy imports_select on statement_imports for select using (can_read_account(user_id));
+create policy imports_write on statement_imports for all
   using (can_write_account(user_id)) with check (can_write_account(user_id));

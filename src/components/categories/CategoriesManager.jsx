@@ -25,7 +25,7 @@ function ConfirmDelete({ name, onConfirm, onCancel }) {
   )
 }
 
-export default function CategoriesManager() {
+export default function CategoriesManager({ canWrite = true }) {
   const { categories, createCategory, deleteCategory } = useCategories()
   const [label, setLabel] = useState('')
   const [emoji, setEmoji] = useState('🏷️')
@@ -52,6 +52,7 @@ export default function CategoriesManager() {
     <div className="flex-1 overflow-y-auto p-6 fade-in">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Add form */}
+        {canWrite && (
         <div className="card p-6">
           <h2 className="text-sm font-semibold text-gray-300 mb-4">New category</h2>
           <form onSubmit={handleAdd} className="space-y-4">
@@ -106,6 +107,7 @@ export default function CategoriesManager() {
             </button>
           </form>
         </div>
+        )}
 
         {/* Category list */}
         <div className="card p-6">
@@ -120,7 +122,7 @@ export default function CategoriesManager() {
                   {c.emoji}
                 </div>
                 <span className="flex-1 text-sm text-gray-200">{c.label}</span>
-                {c.custom ? (
+                {c.custom && canWrite ? (
                   <button
                     onClick={() => setPendingDelete({ id: c.id, label: c.label })}
                     className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
@@ -128,9 +130,9 @@ export default function CategoriesManager() {
                   >
                     <Trash2 size={14} />
                   </button>
-                ) : (
+                ) : !c.custom ? (
                   <span className="text-[10px] uppercase tracking-wide text-gray-600 px-2">Default</span>
-                )}
+                ) : null}
               </div>
             ))}
           </div>

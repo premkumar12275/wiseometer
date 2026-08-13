@@ -7,7 +7,7 @@ import RecentTransactions from './RecentTransactions'
 import TransactionForm from '../transactions/TransactionForm'
 import { Plus } from 'lucide-react'
 
-export default function Dashboard({ user, month, year, onNavigate }) {
+export default function Dashboard({ user, ownerId, canWrite = true, month, year, onNavigate }) {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -15,14 +15,14 @@ export default function Dashboard({ user, month, year, onNavigate }) {
 
   const fetchSummary = async () => {
     setLoading(true)
-    const { data } = await storageService.getMonthlySummary(user.id, month, year)
+    const { data } = await storageService.getMonthlySummary(ownerId, month, year)
     setSummary(data)
     setLoading(false)
   }
 
   useEffect(() => {
     fetchSummary()
-  }, [user.id, month, year])
+  }, [ownerId, month, year])
 
   const handleSaved = () => {
     setShowForm(false)
@@ -41,10 +41,12 @@ export default function Dashboard({ user, month, year, onNavigate }) {
         <div>
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide">Overview</h2>
         </div>
-        <button onClick={() => { setEditTx(null); setShowForm(true) }} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={16} />
-          Add Transaction
-        </button>
+        {canWrite && (
+          <button onClick={() => { setEditTx(null); setShowForm(true) }} className="btn-primary flex items-center gap-2 text-sm">
+            <Plus size={16} />
+            Add Transaction
+          </button>
+        )}
       </div>
 
       <SummaryCards summary={summary} loading={loading} />
@@ -58,12 +60,13 @@ export default function Dashboard({ user, month, year, onNavigate }) {
         summary={summary}
         loading={loading}
         onNavigate={onNavigate}
-        onEdit={handleEdit}
+        onEdit={canWrite ? handleEdit : undefined}
       />
 
       {showForm && (
         <TransactionForm
           user={user}
+          ownerId={ownerId}
           transaction={editTx}
           onSaved={handleSaved}
           onClose={() => { setShowForm(false); setEditTx(null) }}

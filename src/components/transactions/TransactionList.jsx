@@ -102,7 +102,7 @@ function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect, canWri
   )
 }
 
-export default function TransactionList({ user, profile, month, year, group, groups = [], onDeleteGroup }) {
+export default function TransactionList({ user, profile, ownerId, accountCanWrite = true, month, year, group, groups = [], onDeleteGroup }) {
   const [filters, setFilters] = useState({
     category: 'all',
     type: 'all',
@@ -121,14 +121,14 @@ export default function TransactionList({ user, profile, month, year, group, gro
   const [groupSummary, setGroupSummary] = useState(null)
   const [tick, setTick] = useState(0) // bumped after mutations to refresh the group summary
 
-  // Access control for shared groups. Own account and owned groups are full access.
-  const access = group ? group.access : 'owner'
-  const canWrite = access !== 'viewer'          // viewers are read-only
-  const isOwner = access === 'owner'            // only the owner can share / delete the group
-  const ownerId = group ? group.user_id : user.id  // inserts are attributed to the account owner
+  // Access control. In a group, the group's own access role applies; otherwise
+  // the active account's write permission applies.
+  const canWrite = group ? group.access !== 'viewer' : accountCanWrite
+  const isOwner = group ? group.access === 'owner' : false  // only a group owner can share / delete it
+  const writeOwnerId = group ? group.user_id : ownerId       // inserts are attributed to this owner
 
   const { transactions, count, loading, refetch } = useTransactions({
-    userId: user.id,
+    userId: ownerId,
     month,
     year,
     category: filters.category,
@@ -366,7 +366,7 @@ export default function TransactionList({ user, profile, month, year, group, gro
       {showForm && (
         <TransactionForm
           user={user}
-          ownerId={ownerId}
+          ownerId={writeOwnerId}
           transaction={editTx}
           groups={groups}
           defaultGroupId={group?.id}
@@ -396,7 +396,7 @@ export default function TransactionList({ user, profile, month, year, group, gro
         <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0f1117]/95 backdrop-blur-sm fade-in">
           <ImportWizard
             user={user}
-            ownerId={ownerId}
+            ownerId={writeOwnerId}
             groupId={group.id}
             groupName={group.name}
             onClose={() => setShowImport(false)}

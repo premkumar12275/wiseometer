@@ -286,6 +286,70 @@ export const storageService = {
     }
   },
 
+  // ─── Account sharing ─────────────────────────────────────────────────────────
+
+  // Rows the owner created (people they've shared their account with) plus rows
+  // where they're the invitee. Callers filter by owner_id to split the two.
+  getAccountShares: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('account_shares')
+        .select('*')
+        .order('created_at', { ascending: true })
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  shareAccount: async ({ identifier, role, owner }) => {
+    try {
+      const id = (identifier || '').trim()
+      const isEmail = id.includes('@')
+      const { data: found } = await supabase.rpc('find_user', { identifier: id })
+      const invitee = Array.isArray(found) ? found[0] : found
+
+      if (!invitee && !isEmail) return { error: { message: 'No user found with that username.' } }
+      if (invitee && invitee.id === owner.id) return { error: { message: "You can't share with yourself." } }
+      if (!invitee && isEmail && id.toLowerCase() === (owner.email || '').toLowerCase()) {
+        return { error: { message: "You can't share with yourself." } }
+      }
+
+      const row = {
+        owner_id: owner.id,
+        owner_username: owner.username,
+        owner_name: owner.name,
+        owner_email: owner.email,
+        role,
+        ...(invitee
+          ? { invitee_id: invitee.id, invitee_username: invitee.username, invitee_name: invitee.name, invitee_email: invitee.email }
+          : { invitee_email: id.toLowerCase() }),
+      }
+      const { data, error } = await supabase.from('account_shares').insert([row]).select().single()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  updateAccountShareRole: async (id, role) => {
+    try {
+      const { error } = await supabase.from('account_shares').update({ role }).eq('id', id)
+      return { error }
+    } catch (err) {
+      return { error: err }
+    }
+  },
+
+  deleteAccountShare: async (id) => {
+    try {
+      const { error } = await supabase.from('account_shares').delete().eq('id', id)
+      return { error }
+    } catch (err) {
+      return { error: err }
+    }
+  },
+
   // ─── Categories (custom) ─────────────────────────────────────────────────────
 
   getCategories: async (userId) => {

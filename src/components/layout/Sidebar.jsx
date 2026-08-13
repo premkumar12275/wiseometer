@@ -14,6 +14,7 @@ import {
   Shapes,
 } from 'lucide-react'
 import { authService } from '../../services/authService'
+import AccountSwitcher from '../account/AccountSwitcher'
 
 const NAV_ITEMS = [
   { id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
@@ -29,7 +30,10 @@ export default function Sidebar({
   onSelectGroup,
   groups = [],
   onCreateGroup,
+  canCreateGroup = true,
   user,
+  profile,
+  onSwitchAccount,
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -95,13 +99,15 @@ export default function Sidebar({
           {!collapsed && (
             <div className="flex items-center justify-between px-3 mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">Groups</span>
-              <button
-                onClick={() => setAdding((a) => !a)}
-                title="New group"
-                className="text-gray-500 hover:text-teal-400 transition-colors cursor-pointer"
-              >
-                <Plus size={14} />
-              </button>
+              {canCreateGroup && (
+                <button
+                  onClick={() => setAdding((a) => !a)}
+                  title="New group"
+                  className="text-gray-500 hover:text-teal-400 transition-colors cursor-pointer"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
             </div>
           )}
 
@@ -146,7 +152,7 @@ export default function Sidebar({
             )
           })}
 
-          {collapsed && (
+          {collapsed && canCreateGroup && (
             <button
               onClick={() => { setCollapsed(false); setAdding(true) }}
               title="New group"
@@ -160,6 +166,9 @@ export default function Sidebar({
 
       {/* Footer */}
       <div className="border-t border-[#2a2d3a] p-2 space-y-1">
+        {!collapsed && profile && (
+          <AccountSwitcher user={user} profile={profile} onSwitch={onSwitchAccount} />
+        )}
         {!collapsed && user && (
           <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500 truncate">
             <User size={14} className="flex-shrink-0 text-gray-600" />
