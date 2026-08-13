@@ -32,6 +32,14 @@ const CATEGORY_TYPE = {
   transfers: 'transfer',
 }
 
+// Matches a description against the salary keyword list directly (independent
+// of a row's assigned category, which the review screen lets users edit) —
+// used to bulk-exclude salary/income rows during import review.
+export const isLikelySalary = (description) => {
+  const lower = (description || '').toLowerCase()
+  return CATEGORY_KEYWORDS.salary.some((kw) => lower.includes(kw))
+}
+
 export const getCategoryById = (id) =>
   CATEGORIES.find((c) => c.id === id) || CATEGORIES[CATEGORIES.length - 1]
 

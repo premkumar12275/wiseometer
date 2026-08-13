@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCategories } from '../../contexts/CategoriesContext'
 import { formatCurrency } from '../../utils/format'
+import { isLikelySalary } from '../../constants/categories'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 function confidenceBadge(score) {
@@ -20,11 +21,20 @@ const typeColor = (type) => TYPES.find((t) => t.id === type)?.color || 'text-gra
 export default function CategoryReview({ rows, onConfirmed }) {
   const { categories, getCategoryById } = useCategories()
   const [items, setItems] = useState(rows)
+  const [excludeSalary, setExcludeSalary] = useState(false)
 
   const update = (i, patch) =>
     setItems((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
 
   const toggle = (i) => update(i, { excluded: !items[i].excluded })
+
+  const salaryRowCount = items.filter((r) => isLikelySalary(r.description)).length
+
+  const toggleExcludeSalary = () => {
+    const next = !excludeSalary
+    setExcludeSalary(next)
+    setItems((prev) => prev.map((r) => (isLikelySalary(r.description) ? { ...r, excluded: next } : r)))
+  }
 
   const included = items.filter((r) => !r.excluded)
   const fmt = formatCurrency
@@ -44,20 +54,33 @@ export default function CategoryReview({ rows, onConfirmed }) {
         <p className="text-sm text-gray-400">
           {included.length} of {items.length} rows selected
         </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setItems((prev) => prev.map((r) => ({ ...r, excluded: false })))}
-            className="text-xs text-teal-400 hover:text-teal-300 cursor-pointer transition-colors"
-          >
-            Select all
-          </button>
-          <span className="text-gray-700">·</span>
-          <button
-            onClick={() => setItems((prev) => prev.map((r) => ({ ...r, excluded: true })))}
-            className="text-xs text-gray-500 hover:text-gray-300 cursor-pointer transition-colors"
-          >
-            Deselect all
-          </button>
+        <div className="flex items-center gap-4">
+          {salaryRowCount > 0 && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={excludeSalary}
+                onChange={toggleExcludeSalary}
+                className="cursor-pointer accent-teal-400"
+              />
+              Exclude salary/income rows ({salaryRowCount})
+            </label>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setItems((prev) => prev.map((r) => ({ ...r, excluded: false })))}
+              className="text-xs text-teal-400 hover:text-teal-300 cursor-pointer transition-colors"
+            >
+              Select all
+            </button>
+            <span className="text-gray-700">·</span>
+            <button
+              onClick={() => setItems((prev) => prev.map((r) => ({ ...r, excluded: true })))}
+              className="text-xs text-gray-500 hover:text-gray-300 cursor-pointer transition-colors"
+            >
+              Deselect all
+            </button>
+          </div>
         </div>
       </div>
 
