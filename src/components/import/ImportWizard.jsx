@@ -61,8 +61,10 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
     try {
       if (pdf) {
         const { rows } = await parsePDF(f)
-        // PDF rows are parsed as outgoing amounts (expenses).
-        const categorised = rows.map((r) => ({ ...r, ...categorizeImported(r.description, 'out') }))
+        // PDF rows are parsed as outgoing amounts (expenses). PDF parsing has
+        // no separate notes source, so default to blank — same row shape as
+        // the Excel path, editable in the review table either way.
+        const categorised = rows.map((r) => ({ ...r, ...categorizeImported(r.description, 'out'), notes: '' }))
         setReviewRows(categorised)
         setStep(2) // skip column mapping for PDF
       } else {
@@ -91,8 +93,9 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
       // Use local calendar date — see toISODate for the timezone rationale.
       const date = toISODate(rawDate) ?? String(rawDate)
       const description = String(row[mapping.description] || '')
+      const notes = mapping.notes ? String(row[mapping.notes] || '') : ''
       const { category, type, confidence } = categorizeImported(description, direction)
-      return { date, description, amount, type, category, confidence }
+      return { date, description, notes, amount, type, category, confidence }
     }).filter((r) => r && r.amount > 0 && r.date)
     setReviewRows(rows)
     setStep(2)
@@ -106,6 +109,7 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
       user_id: ownerId || user.id,
       date: r.date || today,
       description: r.description || null,
+      notes: r.notes || null,
       amount: r.amount,
       type: r.type || 'expense',
       category: r.category,

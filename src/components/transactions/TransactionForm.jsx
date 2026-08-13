@@ -8,6 +8,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 const EMPTY = {
   date: today(),
   description: '',
+  notes: '',
   amount: '',
   type: 'expense',
   category: 'other',
@@ -20,6 +21,7 @@ export default function TransactionForm({ user, ownerId, transaction, groups = [
   const [form, setForm] = useState(transaction ? {
     date: transaction.date,
     description: transaction.description || '',
+    notes: transaction.notes || '',
     amount: String(transaction.amount),
     type: transaction.type,
     category: transaction.category,
@@ -47,6 +49,7 @@ export default function TransactionForm({ user, ownerId, transaction, groups = [
       user_id: ownerId || user.id,
       date: form.date,
       description: form.description.trim() || null,
+      notes: form.notes.trim() || null,
       amount,
       type: form.type,
       category: form.category,
@@ -133,6 +136,18 @@ export default function TransactionForm({ user, ownerId, transaction, groups = [
               placeholder="What was this for?"
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Notes</label>
+            <textarea
+              rows={2}
+              className="input-field resize-none"
+              placeholder="Optional comment…"
+              value={form.notes}
+              onChange={(e) => set('notes', e.target.value)}
             />
           </div>
 

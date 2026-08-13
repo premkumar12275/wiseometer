@@ -84,6 +84,7 @@ create table transactions (
   group_id uuid references groups(id) on delete set null,
   source text check (source in ('manual','import')) default 'manual',
   import_file text,
+  notes text,
   created_at timestamptz default now()
 );
 

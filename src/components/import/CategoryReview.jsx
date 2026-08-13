@@ -91,6 +91,7 @@ export default function CategoryReview({ rows, onConfirmed }) {
               <th className="px-3 py-2 w-8"></th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Date</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Description</th>
+              <th className="text-left px-3 py-2 text-gray-500 font-medium">Notes</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Amount</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Type</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Category</th>
@@ -114,6 +115,16 @@ export default function CategoryReview({ rows, onConfirmed }) {
                   </td>
                   <td className="px-3 py-2 text-gray-400 font-mono whitespace-nowrap">{row.date}</td>
                   <td className="px-3 py-2 text-gray-300 max-w-[340px] truncate">{row.description}</td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={row.notes || ''}
+                      onChange={(e) => update(i, { notes: e.target.value })}
+                      disabled={row.excluded}
+                      placeholder="—"
+                      className="bg-transparent text-gray-300 border-none outline-none text-xs w-32 placeholder-gray-600"
+                    />
+                  </td>
                   <td className={`px-3 py-2 font-mono whitespace-nowrap ${typeColor(type)}`}>{fmt(row.amount)}</td>
                   <td className="px-3 py-2">
                     <select

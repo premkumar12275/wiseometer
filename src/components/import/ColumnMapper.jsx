@@ -8,6 +8,7 @@ const FIELDS = [
   { key: 'description', label: 'Description',           required: true },
   { key: 'amountOut',   label: 'Money out (expense)',  required: false },
   { key: 'amountIn',    label: 'Money in (income)',    required: false },
+  { key: 'notes',       label: 'Notes',                 required: false },
 ]
 
 function preview(rows, mapping) {
@@ -16,6 +17,7 @@ function preview(rows, mapping) {
     description: row[mapping.description] ?? '',
     amountOut: mapping.amountOut ? row[mapping.amountOut] ?? '' : '',
     amountIn: mapping.amountIn ? row[mapping.amountIn] ?? '' : '',
+    notes: mapping.notes ? row[mapping.notes] ?? '' : '',
   }))
 }
 
@@ -29,6 +31,7 @@ function autoDetect(headers) {
     description: find(['desc', 'text', 'memo', 'narration', 'details', 'merchant']),
     amountOut: find(['withdrawal', 'uttak', 'debet', 'debit', 'out', 'beløp ut']),
     amountIn: find(['deposit', 'innskudd', 'kredit', 'credit', 'beløp inn']),
+    notes: find(['comment', 'comments', 'merknad', 'note', 'anmerkning', 'remark']),
   }
 }
 
@@ -70,7 +73,7 @@ export default function ColumnMapper({ headers, rows, onMapped }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[#2a2d3a]">
-                {['Date', 'Description', 'Money out', 'Money in'].map((h) => (
+                {['Date', 'Description', 'Money out', 'Money in', 'Notes'].map((h) => (
                   <th key={h} className="text-left px-3 py-2 text-gray-500 font-medium">{h}</th>
                 ))}
               </tr>
@@ -82,6 +85,7 @@ export default function ColumnMapper({ headers, rows, onMapped }) {
                   <td className="px-3 py-2 text-gray-300 truncate max-w-[300px]">{String(row.description)}</td>
                   <td className="px-3 py-2 text-red-400/80 font-mono">{String(row.amountOut)}</td>
                   <td className="px-3 py-2 text-green-400/80 font-mono">{String(row.amountIn)}</td>
+                  <td className="px-3 py-2 text-gray-400 truncate max-w-[200px]">{String(row.notes)}</td>
                 </tr>
               ))}
             </tbody>
