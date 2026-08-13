@@ -83,6 +83,7 @@ export default function App() {
             {page === 'transactions' && (
               <TransactionList
                 user={user}
+                profile={profile}
                 month={month}
                 year={year}
                 groups={groups}
@@ -92,6 +93,7 @@ export default function App() {
               <TransactionList
                 key={activeGroup.id}
                 user={user}
+                profile={profile}
                 month={month}
                 year={year}
                 group={activeGroup}

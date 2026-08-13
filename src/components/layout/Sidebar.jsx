@@ -9,6 +9,7 @@ import {
   LogOut,
   User,
   Tag,
+  Users,
   Plus,
   Shapes,
 } from 'lucide-react'
@@ -121,11 +122,15 @@ export default function Sidebar({
 
           {groups.map((g) => {
             const active = currentPage === 'group' && activeGroupId === g.id
+            const Icon = g.shared ? Users : Tag
+            const title = collapsed
+              ? (g.shared ? `${g.name} — shared by ${g.ownerName || g.ownerUsername}` : g.name)
+              : (g.shared ? `Shared by ${g.ownerName || g.ownerUsername}` : undefined)
             return (
               <button
                 key={g.id}
                 onClick={() => onSelectGroup(g)}
-                title={collapsed ? g.name : undefined}
+                title={title}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm
                   transition-colors duration-150 cursor-pointer
@@ -135,7 +140,7 @@ export default function Sidebar({
                   ${collapsed ? 'justify-center' : ''}
                 `}
               >
-                <Tag size={16} className="flex-shrink-0" />
+                <Icon size={16} className="flex-shrink-0" />
                 {!collapsed && <span className="truncate">{g.name}</span>}
               </button>
             )

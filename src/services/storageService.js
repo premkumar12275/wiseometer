@@ -8,9 +8,18 @@ export const storageService = {
       let query = supabase
         .from('transactions')
         .select('*', { count: 'exact' })
-        .eq('user_id', userId)
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
+
+      // A group view is scoped by group_id (RLS allows shared groups, whose rows
+      // belong to the owner, not the viewer). Elsewhere, scope to the user's own
+      // account. Account-level sharing (Phase 2) will replace this with the
+      // active-account owner id.
+      if (groupId) {
+        query = query.eq('group_id', groupId)
+      } else {
+        query = query.eq('user_id', userId)
+      }
 
       // An explicit From/To range overrides the month/year view so it can span
       // months. A group view is all-time, so the month filter is skipped there too.
@@ -22,9 +31,6 @@ export const storageService = {
         const lastDay = new Date(year, month, 0).getDate()
         const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
         query = query.gte('date', from).lte('date', to)
-      }
-      if (groupId) {
-        query = query.eq('group_id', groupId)
       }
       if (category && category !== 'all') {
         query = query.eq('category', category)
@@ -132,12 +138,12 @@ export const storageService = {
 
   // ─── Groups ─────────────────────────────────────────────────────────────────
 
-  getGroups: async (userId) => {
+  // Returns groups the user owns AND groups shared with them (RLS scopes the set).
+  getGroups: async () => {
     try {
       const { data, error } = await supabase
         .from('groups')
         .select('*')
-        .eq('user_id', userId)
         .order('created_at', { ascending: true })
       return { data, error }
     } catch (err) {
@@ -171,12 +177,12 @@ export const storageService = {
     }
   },
 
-  getGroupSummary: async (userId, groupId) => {
+  getGroupSummary: async (groupId) => {
     try {
+      // Scoped by group_id (RLS handles owned vs shared).
       const { data, error } = await supabase
         .from('transactions')
         .select('amount, type')
-        .eq('user_id', userId)
         .eq('group_id', groupId)
       if (error || !data) return { data: null, error }
 
@@ -194,6 +200,89 @@ export const storageService = {
       }
     } catch (err) {
       return { data: null, error: err }
+    }
+  },
+
+  // ─── Group sharing ───────────────────────────────────────────────────────────
+
+  // Members the owner has shared a group with.
+  getGroupShares: async (groupId) => {
+    try {
+      const { data, error } = await supabase
+        .from('group_shares')
+        .select('*')
+        .eq('group_id', groupId)
+        .order('created_at', { ascending: true })
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  // Shares where the current user is the invitee → role per shared group.
+  getMyGroupShares: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('group_shares')
+        .select('group_id, role, owner_username, owner_name')
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  // Invite by username or email. `owner` is the current user's profile (for the
+  // denormalized label the invitee sees).
+  shareGroup: async ({ groupId, identifier, role, owner }) => {
+    try {
+      const id = (identifier || '').trim()
+      const isEmail = id.includes('@')
+      const { data: found } = await supabase.rpc('find_user', { identifier: id })
+      const invitee = Array.isArray(found) ? found[0] : found
+
+      if (!invitee && !isEmail) {
+        return { error: { message: 'No user found with that username.' } }
+      }
+      if (invitee && invitee.id === owner.id) {
+        return { error: { message: "You can't share with yourself." } }
+      }
+      if (!invitee && isEmail && id.toLowerCase() === (owner.email || '').toLowerCase()) {
+        return { error: { message: "You can't share with yourself." } }
+      }
+
+      const row = {
+        group_id: groupId,
+        owner_username: owner.username,
+        owner_name: owner.name,
+        owner_email: owner.email,
+        role,
+        ...(invitee
+          ? { invitee_id: invitee.id, invitee_username: invitee.username, invitee_name: invitee.name, invitee_email: invitee.email }
+          : { invitee_email: id.toLowerCase() }),
+      }
+
+      const { data, error } = await supabase.from('group_shares').insert([row]).select().single()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  updateGroupShareRole: async (id, role) => {
+    try {
+      const { error } = await supabase.from('group_shares').update({ role }).eq('id', id)
+      return { error }
+    } catch (err) {
+      return { error: err }
+    }
+  },
+
+  deleteGroupShare: async (id) => {
+    try {
+      const { error } = await supabase.from('group_shares').delete().eq('id', id)
+      return { error }
+    } catch (err) {
+      return { error: err }
     }
   },
 

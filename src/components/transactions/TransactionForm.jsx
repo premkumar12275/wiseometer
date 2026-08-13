@@ -15,7 +15,7 @@ const EMPTY = {
   group_id: '',
 }
 
-export default function TransactionForm({ user, transaction, groups = [], defaultGroupId, onSaved, onClose }) {
+export default function TransactionForm({ user, ownerId, transaction, groups = [], defaultGroupId, onSaved, onClose }) {
   const { categories } = useCategories()
   const [form, setForm] = useState(transaction ? {
     date: transaction.date,
@@ -42,7 +42,9 @@ export default function TransactionForm({ user, transaction, groups = [], defaul
     setLoading(true)
 
     const payload = {
-      user_id: user.id,
+      // Attribute the row to the account owner (differs from the current user
+      // only when an editor adds to a group shared with them).
+      user_id: ownerId || user.id,
       date: form.date,
       description: form.description.trim() || null,
       amount,

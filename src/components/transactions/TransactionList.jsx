@@ -6,7 +6,8 @@ import { formatCurrency } from '../../utils/format'
 import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
 import ImportWizard from '../import/ImportWizard'
-import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag } from 'lucide-react'
+import ShareGroupModal from '../groups/ShareGroupModal'
+import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
@@ -47,7 +48,7 @@ function ConfirmDelete({ count = 1, title, message, onConfirm, onCancel }) {
   )
 }
 
-function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect }) {
+function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect, canWrite }) {
   const { getCategoryById } = useCategories()
   const cat = getCategoryById(tx.category)
   const isIncome = tx.type === 'income'
@@ -58,13 +59,15 @@ function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect }) {
 
   return (
     <div className={`flex items-center gap-3 px-4 py-3 transition-colors group rounded-lg ${selected ? 'bg-teal-400/10' : 'hover:bg-[#1f2233]'}`}>
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={() => onToggleSelect(tx.id)}
-        className="w-4 h-4 flex-shrink-0 accent-teal-400 cursor-pointer"
-        aria-label="Select transaction"
-      />
+      {canWrite && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(tx.id)}
+          className="w-4 h-4 flex-shrink-0 accent-teal-400 cursor-pointer"
+          aria-label="Select transaction"
+        />
+      )}
 
       <div
         className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
@@ -85,19 +88,21 @@ function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect }) {
         {fmt(tx.amount)}
       </div>
 
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onEdit(tx)} className="p-1.5 rounded-md text-gray-500 hover:text-teal-400 hover:bg-teal-400/10 transition-colors cursor-pointer">
-          <Pencil size={13} />
-        </button>
-        <button onClick={() => onDelete(tx)} className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
-          <Trash2 size={13} />
-        </button>
-      </div>
+      {canWrite && (
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(tx)} className="p-1.5 rounded-md text-gray-500 hover:text-teal-400 hover:bg-teal-400/10 transition-colors cursor-pointer">
+            <Pencil size={13} />
+          </button>
+          <button onClick={() => onDelete(tx)} className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
+            <Trash2 size={13} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
-export default function TransactionList({ user, month, year, group, groups = [], onDeleteGroup }) {
+export default function TransactionList({ user, profile, month, year, group, groups = [], onDeleteGroup }) {
   const [filters, setFilters] = useState({
     category: 'all',
     type: 'all',
@@ -112,8 +117,15 @@ export default function TransactionList({ user, month, year, group, groups = [],
   const [pendingDelete, setPendingDelete] = useState(null) // array of ids awaiting confirmation
   const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [groupSummary, setGroupSummary] = useState(null)
   const [tick, setTick] = useState(0) // bumped after mutations to refresh the group summary
+
+  // Access control for shared groups. Own account and owned groups are full access.
+  const access = group ? group.access : 'owner'
+  const canWrite = access !== 'viewer'          // viewers are read-only
+  const isOwner = access === 'owner'            // only the owner can share / delete the group
+  const ownerId = group ? group.user_id : user.id  // inserts are attributed to the account owner
 
   const { transactions, count, loading, refetch } = useTransactions({
     userId: user.id,
@@ -131,8 +143,8 @@ export default function TransactionList({ user, month, year, group, groups = [],
   // Running totals for the group header (all-time, independent of the page).
   useEffect(() => {
     if (!group) { setGroupSummary(null); return }
-    storageService.getGroupSummary(user.id, group.id).then(({ data }) => setGroupSummary(data))
-  }, [group, user.id, tick])
+    storageService.getGroupSummary(group.id).then(({ data }) => setGroupSummary(data))
+  }, [group, tick])
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
@@ -194,7 +206,15 @@ export default function TransactionList({ user, month, year, group, groups = [],
             <div className="flex items-center gap-2">
               <Tag size={18} className="text-teal-400" />
               <h1 className="text-lg font-semibold text-white">{group.name}</h1>
+              {group.shared && (
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#1f2233] text-gray-400">
+                  Shared · {access}
+                </span>
+              )}
             </div>
+            {group.shared && (
+              <p className="text-xs text-gray-500 mt-1">Shared by {group.ownerName || `@${group.ownerUsername}`}</p>
+            )}
             {groupSummary && (
               <p className="text-xs text-gray-500 mt-1">
                 {groupSummary.count} transaction{groupSummary.count !== 1 ? 's' : ''} · Spent{' '}
@@ -208,12 +228,22 @@ export default function TransactionList({ user, month, year, group, groups = [],
               </p>
             )}
           </div>
-          <button
-            onClick={() => setConfirmGroupDelete(true)}
-            className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 text-red-400 hover:text-red-300"
-          >
-            <Trash2 size={13} /> Delete group
-          </button>
+          {isOwner && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowShare(true)}
+                className="btn-secondary flex items-center gap-1.5 text-xs py-1.5"
+              >
+                <Users size={13} /> Share
+              </button>
+              <button
+                onClick={() => setConfirmGroupDelete(true)}
+                className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 text-red-400 hover:text-red-300"
+              >
+                <Trash2 size={13} /> Delete group
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -229,7 +259,7 @@ export default function TransactionList({ user, month, year, group, groups = [],
           >
             <Download size={14} /> Export CSV
           </button>
-          {group && (
+          {group && canWrite && (
             <button
               onClick={() => setShowImport(true)}
               className="btn-secondary flex items-center gap-2 text-sm py-1.5"
@@ -237,19 +267,21 @@ export default function TransactionList({ user, month, year, group, groups = [],
               <Upload size={14} /> Import
             </button>
           )}
-          <button
-            onClick={() => { setEditTx(null); setShowForm(true) }}
-            className="btn-primary flex items-center gap-2 text-sm py-1.5"
-          >
-            <Plus size={14} /> Add
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => { setEditTx(null); setShowForm(true) }}
+              className="btn-primary flex items-center gap-2 text-sm py-1.5"
+            >
+              <Plus size={14} /> Add
+            </button>
+          )}
         </div>
       </div>
 
       <TransactionFilters filters={filters} onChange={onFiltersChange} />
 
       <div className="card overflow-hidden">
-        {!loading && transactions.length > 0 && (
+        {!loading && transactions.length > 0 && canWrite && (
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a2d3a]">
             <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
               <input
@@ -299,6 +331,7 @@ export default function TransactionList({ user, month, year, group, groups = [],
                 onDelete={(t) => setPendingDelete([t.id])}
                 selected={selectedIds.has(tx.id)}
                 onToggleSelect={toggleSelect}
+                canWrite={canWrite}
               />
             ))}
           </div>
@@ -333,6 +366,7 @@ export default function TransactionList({ user, month, year, group, groups = [],
       {showForm && (
         <TransactionForm
           user={user}
+          ownerId={ownerId}
           transaction={editTx}
           groups={groups}
           defaultGroupId={group?.id}
@@ -362,12 +396,22 @@ export default function TransactionList({ user, month, year, group, groups = [],
         <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0f1117]/95 backdrop-blur-sm fade-in">
           <ImportWizard
             user={user}
+            ownerId={ownerId}
             groupId={group.id}
             groupName={group.name}
             onClose={() => setShowImport(false)}
             onImported={() => { setShowImport(false); setTick((t) => t + 1); refetch() }}
           />
         </div>
+      )}
+
+      {showShare && group && (
+        <ShareGroupModal
+          groupId={group.id}
+          groupName={group.name}
+          owner={{ id: user.id, username: profile?.username, name: profile?.name, email: user.email }}
+          onClose={() => setShowShare(false)}
+        />
       )}
     </div>
   )

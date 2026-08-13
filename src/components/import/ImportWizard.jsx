@@ -41,7 +41,7 @@ function StepIndicator({ current }) {
   )
 }
 
-export default function ImportWizard({ user, onImported, groupId, groupName, onClose }) {
+export default function ImportWizard({ user, ownerId, onImported, groupId, groupName, onClose }) {
   const [step, setStep] = useState(0)
   const [file, setFile] = useState(null)
   const [isPdf, setIsPdf] = useState(false)
@@ -103,7 +103,7 @@ export default function ImportWizard({ user, onImported, groupId, groupName, onC
     setImporting(true)
     const today = new Date().toISOString().slice(0, 10)
     const txArray = included.map((r) => ({
-      user_id: user.id,
+      user_id: ownerId || user.id,
       date: r.date || today,
       description: r.description || null,
       amount: r.amount,
