@@ -10,6 +10,8 @@ const PAGE_TITLES = {
   transactions: 'Transactions',
   import: 'Import Statement',
   categories: 'Categories',
+  activity: 'Activity',
+  investments: 'Investments',
 }
 
 export default function TopBar({ currentPage, title, month, year, viewMode = 'month', onMonthChange, onViewModeChange }) {

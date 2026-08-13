@@ -531,4 +531,92 @@ export const storageService = {
       return { data: null, error: err }
     }
   },
+
+  // ─── Investments ────────────────────────────────────────────────────────────
+
+  getInvestmentsSummary: async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('purchase_date', { ascending: false })
+      if (error || !data) return { data: null, error }
+
+      const invested = data.reduce((sum, i) => sum + parseFloat(i.amount_invested), 0)
+      const currentValue = data.reduce((sum, i) => sum + parseFloat(i.current_value), 0)
+      const gainLoss = currentValue - invested
+      const gainLossPct = invested > 0 ? (gainLoss / invested) * 100 : 0
+
+      return {
+        data: { invested, currentValue, gainLoss, gainLossPct, investments: data },
+        error: null,
+      }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  saveInvestment: async (investment) => {
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .insert([investment])
+        .select()
+        .single()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  saveInvestments: async (investmentArray) => {
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .insert(investmentArray)
+        .select()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  updateInvestment: async (id, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('investments')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  deleteInvestment: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .eq('id', id)
+      return { error }
+    } catch (err) {
+      return { error: err }
+    }
+  },
+
+  deleteInvestments: async (ids) => {
+    try {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .in('id', ids)
+      return { error }
+    } catch (err) {
+      return { error: err }
+    }
+  },
 }

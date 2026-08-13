@@ -13,6 +13,7 @@ import {
   Plus,
   Shapes,
   History,
+  PiggyBank,
 } from 'lucide-react'
 import { version } from '../../../package.json'
 import { authService } from '../../services/authService'
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { id: 'import',       label: 'Import',        icon: Upload },
   { id: 'categories',   label: 'Categories',    icon: Shapes },
   { id: 'activity',     label: 'Activity',      icon: History },
+  { id: 'investments',  label: 'Investments',   icon: PiggyBank },
 ]
 
 export default function Sidebar({

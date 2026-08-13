@@ -5,12 +5,15 @@ import SpendingChart from './SpendingChart'
 import DailyTrend from './DailyTrend'
 import MonthlyTrend from './MonthlyTrend'
 import RecentTransactions from './RecentTransactions'
+import InvestmentsSummaryCard from './InvestmentsSummaryCard'
 import TransactionForm from '../transactions/TransactionForm'
 import { Plus } from 'lucide-react'
 
 export default function Dashboard({ user, ownerId, canWrite = true, month, year, viewMode = 'month', onNavigate }) {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [investmentsSummary, setInvestmentsSummary] = useState(null)
+  const [investmentsLoading, setInvestmentsLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editTx, setEditTx] = useState(null)
 
@@ -23,9 +26,21 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
     setLoading(false)
   }
 
+  // A portfolio snapshot isn't scoped to a month/year — fetched independently.
+  const fetchInvestmentsSummary = async () => {
+    setInvestmentsLoading(true)
+    const { data } = await storageService.getInvestmentsSummary(ownerId)
+    setInvestmentsSummary(data)
+    setInvestmentsLoading(false)
+  }
+
   useEffect(() => {
     fetchSummary()
   }, [ownerId, month, year, viewMode])
+
+  useEffect(() => {
+    fetchInvestmentsSummary()
+  }, [ownerId])
 
   const handleSaved = () => {
     setShowForm(false)
@@ -53,6 +68,8 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
       </div>
 
       <SummaryCards summary={summary} loading={loading} />
+
+      <InvestmentsSummaryCard summary={investmentsSummary} loading={investmentsLoading} onNavigate={onNavigate} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SpendingChart summary={summary} loading={loading} />

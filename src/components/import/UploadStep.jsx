@@ -1,17 +1,20 @@
 import { useState, useCallback } from 'react'
 import { Upload, FileSpreadsheet, FileText, X } from 'lucide-react'
 
-export default function UploadStep({ onFileReady }) {
+export default function UploadStep({
+  onFileReady,
+  accept = ['.xlsx', '.xls', '.pdf'],
+  title = 'Drop your bank statement here',
+  subtitle = 'Supports Excel (.xlsx, .xls) and PDF',
+}) {
   const [dragging, setDragging] = useState(false)
   const [file, setFile] = useState(null)
-
-  const accept = ['.xlsx', '.xls', '.pdf']
 
   const handleFile = (f) => {
     if (!f) return
     const ext = '.' + f.name.split('.').pop().toLowerCase()
     if (!accept.includes(ext)) {
-      alert('Only .xlsx, .xls, and .pdf files are supported.')
+      alert(`Only ${accept.join(', ')} files are supported.`)
       return
     }
     setFile(f)
@@ -44,12 +47,12 @@ export default function UploadStep({ onFileReady }) {
         onClick={() => document.getElementById('file-input').click()}
       >
         <Upload size={36} strokeWidth={1.5} className={dragging ? 'text-teal-400' : 'text-gray-600'} />
-        <p className="text-sm font-medium text-gray-300">Drop your bank statement here</p>
-        <p className="text-xs text-gray-600">Supports Excel (.xlsx, .xls) and PDF</p>
+        <p className="text-sm font-medium text-gray-300">{title}</p>
+        <p className="text-xs text-gray-600">{subtitle}</p>
         <input
           id="file-input"
           type="file"
-          accept=".xlsx,.xls,.pdf"
+          accept={accept.join(',')}
           className="hidden"
           onChange={(e) => handleFile(e.target.files[0])}
         />

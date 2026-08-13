@@ -132,6 +132,28 @@ create table statement_imports (
 alter table statement_imports enable row level security;
 -- Policies for statement_imports are defined in the "Sharing" section below.
 
+-- Investments: a separate portfolio ledger (stocks, funds, crypto, real
+-- estate, bonds, other), independent of the transactions/expense tracking.
+-- Valuation is manual — no market-data API. No group concept.
+create table investments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  name text not null,
+  symbol text,
+  type text check (type in ('stock','fund','crypto','real_estate','bond','other')) not null default 'other',
+  quantity numeric(14,4),
+  amount_invested numeric(12,2) not null,
+  current_value numeric(12,2) not null,
+  purchase_date date not null,
+  notes text,
+  source text check (source in ('manual','import')) default 'manual',
+  created_at timestamptz default now()
+);
+create index investments_user on investments(user_id);
+
+alter table investments enable row level security;
+-- Policies for investments are defined in the "Sharing" section below.
+
 -- ── Sharing (group + account) ────────────────────────────────────────────────
 -- See docs/sharing-design.md. Account-level sharing (Phase 2) will replace the
 -- can_*_account bodies and add account_shares.
@@ -323,4 +345,9 @@ create policy cat_write on categories for all
 -- statement_imports (account-scoped)
 create policy imports_select on statement_imports for select using (can_read_account(user_id));
 create policy imports_write on statement_imports for all
+  using (can_write_account(user_id)) with check (can_write_account(user_id));
+
+-- investments (account-scoped, no group concept)
+create policy inv_select on investments for select using (can_read_account(user_id));
+create policy inv_write on investments for all
   using (can_write_account(user_id)) with check (can_write_account(user_id));
