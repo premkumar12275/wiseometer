@@ -69,6 +69,13 @@ npm run dev
 | `npm run dev`     | Start the dev server         |
 | `npm run build`   | Production build to `dist/`   |
 | `npm run preview` | Preview the production build  |
+| `npm run release -- <patch\|minor\|major>` | Bump version, commit, and tag (`vX.Y.Z`) — push with `git push --follow-tags` after |
+
+## Releasing
+
+The app version is shown in the sidebar footer, with a changelog panel behind it.
+To cut a release: add an entry to `CHANGELOG.md` and `src/constants/changelog.js`,
+run `npm run release -- <patch|minor|major>`, then `git push --follow-tags`.
 
 ## Deployment
 
@@ -83,6 +90,7 @@ tiny Supabase query, preventing the free-tier database from being paused for ina
 
 ```
 api/                       Serverless functions (keep-alive cron)
+CHANGELOG.md               Release history (mirrored in src/constants/changelog.js)
 src/
   components/              UI: dashboard, transactions, import wizard, layout, auth
   constants/categories.js  Categories + import auto-categorization

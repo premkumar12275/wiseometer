@@ -136,6 +136,21 @@ export const storageService = {
     }
   },
 
+  // ─── Transaction history ───────────────────────────────────────────────────
+
+  getTransactionHistory: async (ownerId) => {
+    try {
+      const { data, error } = await supabase
+        .from('transaction_history')
+        .select('*')
+        .eq('owner_id', ownerId)
+        .order('changed_at', { ascending: false })
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
   // ─── Groups ─────────────────────────────────────────────────────────────────
 
   // Returns groups the user owns AND groups shared with them (RLS scopes the set).

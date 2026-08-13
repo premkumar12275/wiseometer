@@ -13,6 +13,7 @@ import Dashboard from './components/dashboard/Dashboard'
 import TransactionList from './components/transactions/TransactionList'
 import ImportWizard from './components/import/ImportWizard'
 import CategoriesManager from './components/categories/CategoriesManager'
+import ActivityLog from './components/activity/ActivityLog'
 
 function LoadingScreen() {
   return (
@@ -120,6 +121,7 @@ function Workspace({ user, profile }) {
               ) : <ViewerNotice />
             )}
             {page === 'categories' && <CategoriesManager canWrite={canWrite} />}
+            {page === 'activity' && <ActivityLog key={ownerId} ownerId={ownerId} groups={groups} />}
           </main>
         </div>
       </div>

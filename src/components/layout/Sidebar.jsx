@@ -12,15 +12,19 @@ import {
   Users,
   Plus,
   Shapes,
+  History,
 } from 'lucide-react'
+import { version } from '../../../package.json'
 import { authService } from '../../services/authService'
 import AccountSwitcher from '../account/AccountSwitcher'
+import ChangelogModal from './ChangelogModal'
 
 const NAV_ITEMS = [
   { id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions',  icon: List },
   { id: 'import',       label: 'Import',        icon: Upload },
   { id: 'categories',   label: 'Categories',    icon: Shapes },
+  { id: 'activity',     label: 'Activity',      icon: History },
 ]
 
 export default function Sidebar({
@@ -38,6 +42,7 @@ export default function Sidebar({
   const [collapsed, setCollapsed] = useState(false)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
+  const [showChangelog, setShowChangelog] = useState(false)
 
   const handleSignOut = async () => {
     await authService.signOut()
@@ -205,7 +210,22 @@ export default function Sidebar({
             </>
           )}
         </button>
+
+        {/* Version / changelog */}
+        <button
+          onClick={() => setShowChangelog(true)}
+          title="What's new"
+          className={`
+            w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-600
+            hover:text-gray-400 hover:bg-[#1f2233] transition-colors duration-150 cursor-pointer
+            ${collapsed ? 'justify-center' : ''}
+          `}
+        >
+          {collapsed ? <span>v</span> : <span>v{version}</span>}
+        </button>
       </div>
+
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </aside>
   )
 }

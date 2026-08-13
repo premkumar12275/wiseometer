@@ -93,6 +93,31 @@ alter table transactions enable row level security;
 create index transactions_user_date on transactions(user_id, date desc);
 create index transactions_group on transactions(group_id);
 
+-- Data change history / audit trail: every insert/update/delete on
+-- transactions is logged via trigger (not application code), so no write
+-- path can skip it. Relevant now that shared editors can modify each
+-- other's data. group_id is denormalized so history stays visible via
+-- can_read_group after the transaction itself is deleted.
+create table transaction_history (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id uuid not null,
+  owner_id uuid not null,
+  group_id uuid,
+  action text check (action in ('insert','update','delete')) not null,
+  changed_by uuid references auth.users(id),
+  changed_by_username citext,
+  changed_by_name text,
+  old_data jsonb,
+  new_data jsonb,
+  changed_at timestamptz default now()
+);
+create index transaction_history_tx    on transaction_history (transaction_id);
+create index transaction_history_owner on transaction_history (owner_id, changed_at desc);
+
+alter table transaction_history enable row level security;
+-- Policy for transaction_history is defined in the "Sharing" section below
+-- (can_read_group is not yet defined at this point in the file).
+
 -- Statement import log
 create table statement_imports (
   id uuid primary key default gen_random_uuid(),
@@ -246,6 +271,37 @@ create policy tx_update on transactions for update
   with check (can_write_account(user_id) or (group_id is not null and can_write_group(group_id)));
 create policy tx_delete on transactions for delete using (
   can_write_account(user_id) or (group_id is not null and can_write_group(group_id))
+);
+
+-- transaction_history: logged by trigger (security definer), never written
+-- to directly by clients.
+create or replace function log_transaction_change()
+returns trigger language plpgsql security definer as $$
+declare
+  v_username citext;
+  v_name text;
+begin
+  select username, name into v_username, v_name from profiles where id = auth.uid();
+  insert into transaction_history
+    (transaction_id, owner_id, group_id, action, changed_by, changed_by_username, changed_by_name, old_data, new_data)
+  values (
+    coalesce(new.id, old.id),
+    coalesce(new.user_id, old.user_id),
+    coalesce(new.group_id, old.group_id),
+    lower(tg_op),
+    auth.uid(), v_username, v_name,
+    case when tg_op <> 'INSERT' then to_jsonb(old) else null end,
+    case when tg_op <> 'DELETE' then to_jsonb(new) else null end
+  );
+  return coalesce(new, old);
+end;
+$$;
+create trigger transactions_history_trigger
+  after insert or update or delete on transactions
+  for each row execute function log_transaction_change();
+
+create policy tx_history_select on transaction_history for select using (
+  can_read_account(owner_id) or (group_id is not null and can_read_group(group_id))
 );
 
 -- groups
