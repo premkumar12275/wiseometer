@@ -140,7 +140,7 @@ create table investments (
   user_id uuid references auth.users(id) on delete cascade,
   name text not null,
   symbol text,
-  type text check (type in ('stock','fund','crypto','real_estate','bond','other')) not null default 'other',
+  type text check (type in ('stock','fund','crypto','real_estate','bond','gold','cash','other')) not null default 'other',
   quantity numeric(14,4),
   amount_invested numeric(12,2) not null,
   current_value numeric(12,2) not null,

@@ -6,6 +6,8 @@ export const INVESTMENT_TYPES = [
   { id: 'crypto',      label: 'Crypto',      emoji: '₿',  color: '#f59e0b' },
   { id: 'real_estate', label: 'Real Estate', emoji: '🏠', color: '#22c55e' },
   { id: 'bond',        label: 'Bonds',       emoji: '🏦', color: '#64748b' },
+  { id: 'gold',        label: 'Gold/Metals', emoji: '🪙', color: '#eab308' },
+  { id: 'cash',        label: 'Cash/Savings', emoji: '💵', color: '#14b8a6' },
   { id: 'other',       label: 'Other',       emoji: '💼', color: '#6b7280' },
 ]
 
