@@ -62,9 +62,9 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
       if (pdf) {
         const { rows } = await parsePDF(f)
         // PDF rows are parsed as outgoing amounts (expenses). PDF parsing has
-        // no separate notes source, so default to blank — same row shape as
-        // the Excel path, editable in the review table either way.
-        const categorised = rows.map((r) => ({ ...r, ...categorizeImported(r.description, 'out'), notes: '' }))
+        // no separate notes/tags source, so default to blank — same row shape
+        // as the Excel path, editable in the review table either way.
+        const categorised = rows.map((r) => ({ ...r, ...categorizeImported(r.description, 'out'), notes: '', tags: [] }))
         setReviewRows(categorised)
         setStep(2) // skip column mapping for PDF
       } else {
@@ -94,8 +94,11 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
       const date = toISODate(rawDate) ?? String(rawDate)
       const description = String(row[mapping.description] || '')
       const notes = mapping.notes ? String(row[mapping.notes] || '') : ''
+      const tags = mapping.tags
+        ? String(row[mapping.tags] || '').split(/[,;]/).map((s) => s.trim()).filter(Boolean)
+        : []
       const { category, type, confidence } = categorizeImported(description, direction)
-      return { date, description, notes, amount, type, category, confidence }
+      return { date, description, notes, tags, amount, type, category, confidence }
     }).filter((r) => r && r.amount > 0 && r.date)
     setReviewRows(rows)
     setStep(2)
@@ -110,6 +113,7 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
       date: r.date || today,
       description: r.description || null,
       notes: r.notes || null,
+      tags: r.tags || [],
       amount: r.amount,
       type: r.type || 'expense',
       category: r.category,
@@ -201,7 +205,7 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
                   <p className="text-sm">Importing transactions…</p>
                 </div>
               ) : (
-                <CategoryReview rows={reviewRows} onConfirmed={handleConfirmed} />
+                <CategoryReview rows={reviewRows} onConfirmed={handleConfirmed} ownerId={ownerId || user.id} />
               )}
             </>
           )}

@@ -81,6 +81,15 @@ function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect, canWri
           {tx.description || <span className="text-gray-600 italic">No description</span>}
         </p>
         <p className="text-xs text-gray-500">{tx.date} · {cat.label}</p>
+        {tx.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {tx.tags.map((tag) => (
+              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-400/10 text-teal-400">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className={`amount-font text-sm font-semibold flex items-center gap-1 ${amountColor}`}>

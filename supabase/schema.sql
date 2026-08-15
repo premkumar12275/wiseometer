@@ -85,6 +85,7 @@ create table transactions (
   source text check (source in ('manual','import')) default 'manual',
   import_file text,
   notes text,
+  tags text[] default '{}',
   created_at timestamptz default now()
 );
 
@@ -221,6 +222,16 @@ returns boolean language sql security definer stable as $$
                  where owner_id = p_owner
                    and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
 $$;
+
+-- Distinct tags already used on an owner's transactions, for tag-entry
+-- autocomplete.
+create or replace function get_transaction_tags(p_owner uuid)
+returns text[] language sql security definer stable as $$
+  select coalesce(array_agg(distinct tag order by tag), '{}'::text[])
+  from transactions, unnest(tags) as tag
+  where transactions.user_id = p_owner and can_read_account(p_owner);
+$$;
+grant execute on function get_transaction_tags(uuid) to authenticated;
 
 create or replace function can_write_account(p_owner uuid)
 returns boolean language sql security definer stable as $$

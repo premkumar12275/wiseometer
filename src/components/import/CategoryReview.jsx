@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useCategories } from '../../contexts/CategoriesContext'
+import { useTransactionTags } from '../../hooks/useTransactionTags'
 import { formatCurrency } from '../../utils/format'
 import { isLikelySalary } from '../../constants/categories'
+import TagInput from '../common/TagInput'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 function confidenceBadge(score) {
@@ -18,8 +20,9 @@ const TYPES = [
 
 const typeColor = (type) => TYPES.find((t) => t.id === type)?.color || 'text-gray-300'
 
-export default function CategoryReview({ rows, onConfirmed }) {
+export default function CategoryReview({ rows, onConfirmed, ownerId }) {
   const { categories, getCategoryById } = useCategories()
+  const { tags: tagSuggestions } = useTransactionTags(ownerId)
   const [items, setItems] = useState(rows)
   const [excludeSalary, setExcludeSalary] = useState(false)
 
@@ -92,6 +95,7 @@ export default function CategoryReview({ rows, onConfirmed }) {
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Date</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Description</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Notes</th>
+              <th className="text-left px-3 py-2 text-gray-500 font-medium">Tags</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Amount</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Type</th>
               <th className="text-left px-3 py-2 text-gray-500 font-medium">Category</th>
@@ -123,6 +127,16 @@ export default function CategoryReview({ rows, onConfirmed }) {
                       disabled={row.excluded}
                       placeholder="—"
                       className="bg-transparent text-gray-300 border-none outline-none text-xs w-32 placeholder-gray-600"
+                    />
+                  </td>
+                  <td className="px-3 py-2 min-w-[140px]">
+                    <TagInput
+                      compact
+                      disabled={row.excluded}
+                      value={row.tags || []}
+                      onChange={(t) => update(i, { tags: t })}
+                      suggestions={tagSuggestions}
+                      placeholder="—"
                     />
                   </td>
                   <td className={`px-3 py-2 font-mono whitespace-nowrap ${typeColor(type)}`}>{fmt(row.amount)}</td>

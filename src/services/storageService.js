@@ -155,6 +155,15 @@ export const storageService = {
     }
   },
 
+  getTransactionTags: async (ownerId) => {
+    try {
+      const { data, error } = await supabase.rpc('get_transaction_tags', { p_owner: ownerId })
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
   // ─── Transaction history ───────────────────────────────────────────────────
 
   getTransactionHistory: async (ownerId) => {

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useCategories } from '../../contexts/CategoriesContext'
+import { useTransactionTags } from '../../hooks/useTransactionTags'
 import { storageService } from '../../services/storageService'
+import TagInput from '../common/TagInput'
 import { X } from 'lucide-react'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -9,6 +11,7 @@ const EMPTY = {
   date: today(),
   description: '',
   notes: '',
+  tags: [],
   amount: '',
   type: 'expense',
   category: 'other',
@@ -18,10 +21,12 @@ const EMPTY = {
 
 export default function TransactionForm({ user, ownerId, transaction, groups = [], defaultGroupId, onSaved, onClose }) {
   const { categories } = useCategories()
+  const { tags: tagSuggestions } = useTransactionTags(ownerId || user.id)
   const [form, setForm] = useState(transaction ? {
     date: transaction.date,
     description: transaction.description || '',
     notes: transaction.notes || '',
+    tags: transaction.tags || [],
     amount: String(transaction.amount),
     type: transaction.type,
     category: transaction.category,
@@ -50,6 +55,7 @@ export default function TransactionForm({ user, ownerId, transaction, groups = [
       date: form.date,
       description: form.description.trim() || null,
       notes: form.notes.trim() || null,
+      tags: form.tags,
       amount,
       type: form.type,
       category: form.category,
@@ -149,6 +155,12 @@ export default function TransactionForm({ user, ownerId, transaction, groups = [
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
             />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Tags</label>
+            <TagInput value={form.tags} onChange={(t) => set('tags', t)} suggestions={tagSuggestions} />
           </div>
 
           {/* Date */}

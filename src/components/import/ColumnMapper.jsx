@@ -9,6 +9,7 @@ const FIELDS = [
   { key: 'amountOut',   label: 'Money out (expense)',  required: false },
   { key: 'amountIn',    label: 'Money in (income)',    required: false },
   { key: 'notes',       label: 'Notes',                 required: false },
+  { key: 'tags',        label: 'Tags',                  required: false },
 ]
 
 function preview(rows, mapping) {
@@ -18,6 +19,7 @@ function preview(rows, mapping) {
     amountOut: mapping.amountOut ? row[mapping.amountOut] ?? '' : '',
     amountIn: mapping.amountIn ? row[mapping.amountIn] ?? '' : '',
     notes: mapping.notes ? row[mapping.notes] ?? '' : '',
+    tags: mapping.tags ? row[mapping.tags] ?? '' : '',
   }))
 }
 
@@ -32,6 +34,7 @@ function autoDetect(headers) {
     amountOut: find(['withdrawal', 'uttak', 'debet', 'debit', 'out', 'beløp ut']),
     amountIn: find(['deposit', 'innskudd', 'kredit', 'credit', 'beløp inn']),
     notes: find(['comment', 'comments', 'merknad', 'note', 'anmerkning', 'remark']),
+    tags: find(['tag', 'tags', 'label', 'labels']),
   }
 }
 
@@ -73,7 +76,7 @@ export default function ColumnMapper({ headers, rows, onMapped }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[#2a2d3a]">
-                {['Date', 'Description', 'Money out', 'Money in', 'Notes'].map((h) => (
+                {['Date', 'Description', 'Money out', 'Money in', 'Notes', 'Tags'].map((h) => (
                   <th key={h} className="text-left px-3 py-2 text-gray-500 font-medium">{h}</th>
                 ))}
               </tr>
@@ -86,6 +89,7 @@ export default function ColumnMapper({ headers, rows, onMapped }) {
                   <td className="px-3 py-2 text-red-400/80 font-mono">{String(row.amountOut)}</td>
                   <td className="px-3 py-2 text-green-400/80 font-mono">{String(row.amountIn)}</td>
                   <td className="px-3 py-2 text-gray-400 truncate max-w-[200px]">{String(row.notes)}</td>
+                  <td className="px-3 py-2 text-gray-400 truncate max-w-[150px]">{String(row.tags)}</td>
                 </tr>
               ))}
             </tbody>
