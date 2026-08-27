@@ -126,6 +126,7 @@ export default function ImportWizard({ user, ownerId, onImported, groupId, group
     const { data, error: saveErr } = await storageService.saveTransactions(txArray)
     if (saveErr) {
       setResult({ error: saveErr.message })
+      setStep(3) // the failure message only renders on the final step
       setImporting(false)
       return
     }
