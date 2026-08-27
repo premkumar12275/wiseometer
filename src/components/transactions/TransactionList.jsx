@@ -6,9 +6,10 @@ import { formatCurrency } from '../../utils/format'
 import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
 import { DisplayRow, EditRow } from './TransactionRow'
+import BulkEditModal from './BulkEditModal'
 import ImportWizard from '../import/ImportWizard'
 import ShareGroupModal from '../groups/ShareGroupModal'
-import { Trash2, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
+import { Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
@@ -68,6 +69,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [pendingDelete, setPendingDelete] = useState(null) // array of ids awaiting confirmation
   const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
+  const [showBulkEdit, setShowBulkEdit] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [groupSummary, setGroupSummary] = useState(null)
@@ -248,12 +250,20 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
               {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
             </label>
             {selectedIds.size > 0 && (
-              <button
-                onClick={() => setPendingDelete([...selectedIds])}
-                className="btn-danger flex items-center gap-1.5 text-xs py-1 px-2.5"
-              >
-                <Trash2 size={13} /> Delete {selectedIds.size}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowBulkEdit(true)}
+                  className="btn-secondary flex items-center gap-1.5 text-xs py-1 px-2.5"
+                >
+                  <Pencil size={13} /> Edit {selectedIds.size}
+                </button>
+                <button
+                  onClick={() => setPendingDelete([...selectedIds])}
+                  className="btn-danger flex items-center gap-1.5 text-xs py-1 px-2.5"
+                >
+                  <Trash2 size={13} /> Delete {selectedIds.size}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -361,6 +371,17 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
           defaultGroupId={group?.id}
           onSaved={handleSaved}
           onClose={() => setShowForm(false)}
+        />
+      )}
+
+      {showBulkEdit && (
+        <BulkEditModal
+          transactions={transactions.filter((t) => selectedIds.has(t.id))}
+          groups={groups}
+          tagSuggestions={tagSuggestions}
+          showGroup={showGroup}
+          onSaved={() => { setShowBulkEdit(false); clearSelection(); handleSaved() }}
+          onClose={() => setShowBulkEdit(false)}
         />
       )}
 

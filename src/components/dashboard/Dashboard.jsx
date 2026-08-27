@@ -62,6 +62,7 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
   }
 
   const periodLabel = viewMode === 'year' ? String(year) : `${MONTHS[month - 1]} ${year}`
+  const periodShort = viewMode === 'year' ? String(year) : `${MONTHS[month - 1].slice(0, 3)} ${year}`
 
   const handleEdit = (tx) => {
     setEditTx(tx)
@@ -89,6 +90,7 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
         groups={groups}
         allTimeTotals={groupTotals}
         periodLabel={periodLabel}
+        periodShort={periodShort}
         loading={loading}
         onSelectGroup={onSelectGroup}
       />

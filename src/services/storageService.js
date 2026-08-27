@@ -131,6 +131,38 @@ export const storageService = {
     }
   },
 
+  // Same patch applied to every id. Tag add/remove can't go through this (each
+  // row needs its own merged array) — see updateTransactionsIndividually.
+  updateTransactions: async (ids, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .update(updates)
+        .in('id', ids)
+        .select()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  // A different patch per row, for bulk edits that depend on each row's current
+  // value. Selection is capped at one page, so this stays a small handful of
+  // requests. Stops at the first failure and reports how many landed.
+  updateTransactionsIndividually: async (patches) => {
+    try {
+      let updated = 0
+      for (const { id, updates } of patches) {
+        const { error } = await supabase.from('transactions').update(updates).eq('id', id)
+        if (error) return { data: { updated }, error }
+        updated += 1
+      }
+      return { data: { updated }, error: null }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
   deleteTransaction: async (id) => {
     try {
       const { error } = await supabase

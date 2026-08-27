@@ -5,7 +5,7 @@ import { Tag, ChevronRight } from 'lucide-react'
 // instead, one row per group. Each row shows the selected period's spend with
 // the group's all-time total underneath, since a group (a trip, a renovation)
 // usually spans more months than the dashboard is showing.
-export default function GroupBreakdown({ summary, groups = [], allTimeTotals, periodLabel, loading, onSelectGroup }) {
+export default function GroupBreakdown({ summary, groups = [], allTimeTotals, periodLabel, periodShort, loading, onSelectGroup }) {
   // Nothing to skeleton for an account that has no groups at all.
   if (loading) {
     if (groups.length === 0) return null
@@ -60,12 +60,22 @@ export default function GroupBreakdown({ summary, groups = [], allTimeTotals, pe
                 </p>
               </div>
 
-              <div className="text-right flex-shrink-0">
-                <p className="amount-font text-sm font-semibold text-red-400">{formatCurrency(expense)}</p>
-                {allTime && (
-                  <p className="text-[11px] text-gray-600 amount-font">
-                    {formatCurrency(allTime.expense)} all-time
+              {/* Two figures of equal weight: what this group cost in the period
+                  on the left, what it has cost in total on the right. */}
+              <div className="flex items-center gap-5 flex-shrink-0 text-right">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-gray-600 mb-0.5">{periodShort || 'Period'}</p>
+                  <p className="amount-font text-sm font-semibold text-red-400 whitespace-nowrap">
+                    {formatCurrency(expense)}
                   </p>
+                </div>
+                {allTime && (
+                  <div className="pl-5 border-l border-[#2a2d3a]">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-600 mb-0.5">All-time</p>
+                    <p className="amount-font text-base font-semibold text-gray-100 whitespace-nowrap">
+                      {formatCurrency(allTime.expense)}
+                    </p>
+                  </div>
                 )}
               </div>
 
