@@ -141,7 +141,9 @@ export default function App() {
   if (recovery) return <ResetPassword onDone={clearRecovery} />
   if (loading) return <LoadingScreen />
   if (!user) return <AuthGate user={null} />
-  if (profileLoading) return <LoadingScreen />
+  // Only the first load blanks the app. A later refetch (e.g. after
+  // ProfileSetup) keeps the workspace mounted so its state survives.
+  if (profileLoading && !profile) return <LoadingScreen />
   if (!profile) return <ProfileSetup user={user} onDone={refetchProfile} />
 
   return (

@@ -8,13 +8,18 @@ export function useProfile(user) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Keyed on the id, not the user object: a token refresh hands back an
+  // equivalent-but-new object, and depending on it would refetch (and blank
+  // the app) on every tab focus.
+  const userId = user?.id
+
   const load = useCallback(async () => {
-    if (!user) { setProfile(null); setLoading(false); return }
+    if (!userId) { setProfile(null); setLoading(false); return }
     setLoading(true)
-    const { data } = await authService.getProfile(user.id)
+    const { data } = await authService.getProfile(userId)
     setProfile(data || null)
     setLoading(false)
-  }, [user])
+  }, [userId])
 
   useEffect(() => { load() }, [load])
 
