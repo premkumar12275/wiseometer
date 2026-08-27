@@ -463,6 +463,49 @@ export const storageService = {
 
   // ─── Summary ─────────────────────────────────────────────────────────────────
 
+  // The dashboard keeps grouped spending out of the headline totals and shows
+  // each group as its own section, so every summary reports on the UNGROUPED
+  // rows and hands back a per-group breakdown alongside. `transactions` stays
+  // complete — the recent-activity feed is a feed, not a total.
+  summarize: (data, bucketOf) => {
+    const ungrouped = data.filter((t) => !t.group_id)
+    const sumType = (rows, type) =>
+      rows.filter((t) => t.type === type).reduce((sum, t) => sum + parseFloat(t.amount), 0)
+
+    const income = sumType(ungrouped, 'income')
+    const expenses = sumType(ungrouped, 'expense')
+
+    const byCategory = ungrouped
+      .filter((t) => t.type === 'expense')
+      .reduce((acc, t) => {
+        acc[t.category] = (acc[t.category] || 0) + parseFloat(t.amount)
+        return acc
+      }, {})
+
+    const byBucket = ungrouped
+      .filter((t) => t.type === 'expense')
+      .reduce((acc, t) => {
+        const key = bucketOf(t)
+        acc[key] = (acc[key] || 0) + parseFloat(t.amount)
+        return acc
+      }, {})
+
+    // Per-group totals for the same period, keyed by group id.
+    const groupIds = [...new Set(data.filter((t) => t.group_id).map((t) => t.group_id))]
+    const groups = groupIds.map((id) => {
+      const rows = data.filter((t) => t.group_id === id)
+      return {
+        groupId: id,
+        count: rows.length,
+        expense: sumType(rows, 'expense'),
+        income: sumType(rows, 'income'),
+        transfer: sumType(rows, 'transfer'),
+      }
+    }).sort((a, b) => b.expense - a.expense)
+
+    return { income, expenses, net: income - expenses, byCategory, byBucket, groups, transactions: data }
+  },
+
   getMonthlySummary: async (userId, month, year) => {
     try {
       const { data, error } = await storageService.getAllTransactionsForMonth({
@@ -472,33 +515,8 @@ export const storageService = {
       })
       if (error || !data) return { data: null, error }
 
-      const income = data
-        .filter((t) => t.type === 'income')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
-
-      const expenses = data
-        .filter((t) => t.type === 'expense')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
-
-      const byCategory = data
-        .filter((t) => t.type === 'expense')
-        .reduce((acc, t) => {
-          acc[t.category] = (acc[t.category] || 0) + parseFloat(t.amount)
-          return acc
-        }, {})
-
-      const byDay = data
-        .filter((t) => t.type === 'expense')
-        .reduce((acc, t) => {
-          const day = t.date.slice(8, 10)
-          acc[day] = (acc[day] || 0) + parseFloat(t.amount)
-          return acc
-        }, {})
-
-      return {
-        data: { income, expenses, net: income - expenses, byCategory, byDay, transactions: data },
-        error: null,
-      }
+      const { byBucket, ...rest } = storageService.summarize(data, (t) => t.date.slice(8, 10))
+      return { data: { ...rest, byDay: byBucket }, error: null }
     } catch (err) {
       return { data: null, error: err }
     }
@@ -509,33 +527,33 @@ export const storageService = {
       const { data, error } = await storageService.getAllTransactionsForYear({ userId, year })
       if (error || !data) return { data: null, error }
 
-      const income = data
-        .filter((t) => t.type === 'income')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+      const { byBucket, ...rest } = storageService.summarize(data, (t) => t.date.slice(5, 7))
+      return { data: { ...rest, byMonth: byBucket }, error: null }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
 
-      const expenses = data
-        .filter((t) => t.type === 'expense')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0)
+  // All-time totals for every group the account owns, in one query — the
+  // dashboard shows each group's lifetime spend next to its period spend
+  // (a trip group routinely spans several months).
+  getAllGroupTotals: async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('group_id, amount, type')
+        .eq('user_id', userId)
+        .not('group_id', 'is', null)
+      if (error || !data) return { data: null, error }
 
-      const byCategory = data
-        .filter((t) => t.type === 'expense')
-        .reduce((acc, t) => {
-          acc[t.category] = (acc[t.category] || 0) + parseFloat(t.amount)
-          return acc
-        }, {})
+      const totals = data.reduce((acc, t) => {
+        const g = (acc[t.group_id] ||= { count: 0, expense: 0, income: 0, transfer: 0 })
+        g.count += 1
+        g[t.type] += parseFloat(t.amount)
+        return acc
+      }, {})
 
-      const byMonth = data
-        .filter((t) => t.type === 'expense')
-        .reduce((acc, t) => {
-          const monthKey = t.date.slice(5, 7)
-          acc[monthKey] = (acc[monthKey] || 0) + parseFloat(t.amount)
-          return acc
-        }, {})
-
-      return {
-        data: { income, expenses, net: income - expenses, byCategory, byMonth, transactions: data },
-        error: null,
-      }
+      return { data: totals, error: null }
     } catch (err) {
       return { data: null, error: err }
     }

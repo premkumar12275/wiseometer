@@ -29,8 +29,12 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
   A transaction's `category` is a built-in slug ('food') or a custom uuid.
   `categorizeImported`/`autoCategorize` remain keyword-based over built-ins only
 - Groups (spending buckets, e.g. "London Trip") are a `groups` table + nullable
-  `transactions.group_id`. A group is a tag: grouped transactions still count in the
-  monthly dashboard/totals. The group view (TransactionList with a `group` prop) is
+  `transactions.group_id`. A group is a tag, but grouped transactions are EXCLUDED
+  from the dashboard's headline figures: `summarize()` in storageService totals only
+  rows with no `group_id` (cards, spending chart and trend alike) and returns a
+  per-group breakdown that `GroupBreakdown` renders as its own section — period
+  spend per group, with all-time spend from `getAllGroupTotals` underneath.
+  The group view (TransactionList with a `group` prop) is
   all-time (month filter skipped when `groupId` is set). The group view reuses the
   SAME TransactionForm/ImportWizard/TransactionList — features added there apply to
   groups automatically, no group-specific code needed

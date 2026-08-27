@@ -84,7 +84,18 @@ function Workspace({ user, profile }) {
 
           <main className="flex-1 overflow-hidden flex flex-col">
             {page === 'dashboard' && (
-              <Dashboard key={ownerId} user={user} ownerId={ownerId} canWrite={canWrite} month={month} year={year} viewMode={viewMode} onNavigate={goToPage} />
+              <Dashboard
+                key={ownerId}
+                user={user}
+                ownerId={ownerId}
+                canWrite={canWrite}
+                month={month}
+                year={year}
+                viewMode={viewMode}
+                onNavigate={goToPage}
+                groups={groups}
+                onSelectGroup={selectGroup}
+              />
             )}
             {page === 'transactions' && (
               <TransactionList

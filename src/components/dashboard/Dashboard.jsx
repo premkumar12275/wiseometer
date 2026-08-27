@@ -6,14 +6,19 @@ import DailyTrend from './DailyTrend'
 import MonthlyTrend from './MonthlyTrend'
 import RecentTransactions from './RecentTransactions'
 import InvestmentsSummaryCard from './InvestmentsSummaryCard'
+import GroupBreakdown from './GroupBreakdown'
 import TransactionForm from '../transactions/TransactionForm'
 import { Plus } from 'lucide-react'
 
-export default function Dashboard({ user, ownerId, canWrite = true, month, year, viewMode = 'month', onNavigate }) {
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December']
+
+export default function Dashboard({ user, ownerId, canWrite = true, month, year, viewMode = 'month', onNavigate, groups = [], onSelectGroup }) {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [investmentsSummary, setInvestmentsSummary] = useState(null)
   const [investmentsLoading, setInvestmentsLoading] = useState(true)
+  const [groupTotals, setGroupTotals] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editTx, setEditTx] = useState(null)
 
@@ -34,19 +39,29 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
     setInvestmentsLoading(false)
   }
 
+  // Group lifetime totals aren't period-scoped either — one query for all groups.
+  const fetchGroupTotals = async () => {
+    const { data } = await storageService.getAllGroupTotals(ownerId)
+    setGroupTotals(data)
+  }
+
   useEffect(() => {
     fetchSummary()
   }, [ownerId, month, year, viewMode])
 
   useEffect(() => {
     fetchInvestmentsSummary()
+    fetchGroupTotals()
   }, [ownerId])
 
   const handleSaved = () => {
     setShowForm(false)
     setEditTx(null)
     fetchSummary()
+    fetchGroupTotals()
   }
+
+  const periodLabel = viewMode === 'year' ? String(year) : `${MONTHS[month - 1]} ${year}`
 
   const handleEdit = (tx) => {
     setEditTx(tx)
@@ -68,6 +83,15 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
       </div>
 
       <SummaryCards summary={summary} loading={loading} />
+
+      <GroupBreakdown
+        summary={summary}
+        groups={groups}
+        allTimeTotals={groupTotals}
+        periodLabel={periodLabel}
+        loading={loading}
+        onSelectGroup={onSelectGroup}
+      />
 
       <InvestmentsSummaryCard summary={investmentsSummary} loading={investmentsLoading} onNavigate={onNavigate} />
 
