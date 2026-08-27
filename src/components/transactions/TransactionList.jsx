@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react'
 import { useTransactions } from '../../hooks/useTransactions'
+import { useTransactionTags } from '../../hooks/useTransactionTags'
 import { storageService } from '../../services/storageService'
-import { useCategories } from '../../contexts/CategoriesContext'
 import { formatCurrency } from '../../utils/format'
 import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
+import { DisplayRow, EditRow } from './TransactionRow'
 import ImportWizard from '../import/ImportWizard'
 import ShareGroupModal from '../groups/ShareGroupModal'
-import { ArrowUpRight, ArrowDownRight, ArrowLeftRight, Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
+import { Trash2, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
 
 const PAGE_SIZE = 20
 
-function exportCSV(transactions) {
-  const header = ['Date', 'Description', 'Amount', 'Type', 'Category', 'Account']
+function exportCSV(transactions, groups = []) {
+  const csvText = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const header = ['Date', 'Description', 'Notes', 'Tags', 'Amount', 'Type', 'Category', 'Account', 'Group', 'Source']
   const rows = transactions.map((t) => [
     t.date,
-    `"${(t.description || '').replace(/"/g, '""')}"`,
+    csvText(t.description),
+    csvText(t.notes),
+    csvText((t.tags || []).join(', ')),
     t.amount,
     t.type,
     t.category,
-    t.account || 'Main',
+    csvText(t.account || 'Main'),
+    csvText(groups.find((g) => g.id === t.group_id)?.name),
+    t.source || 'manual',
   ])
   const csv = [header, ...rows].map((r) => r.join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
@@ -48,69 +54,6 @@ function ConfirmDelete({ count = 1, title, message, onConfirm, onCancel }) {
   )
 }
 
-function TransactionRow({ tx, onEdit, onDelete, selected, onToggleSelect, canWrite }) {
-  const { getCategoryById } = useCategories()
-  const cat = getCategoryById(tx.category)
-  const isIncome = tx.type === 'income'
-  const isTransfer = tx.type === 'transfer'
-  const amountColor = isTransfer ? 'text-slate-400' : isIncome ? 'text-green-400' : 'text-red-400'
-  const AmountIcon = isTransfer ? ArrowLeftRight : isIncome ? ArrowUpRight : ArrowDownRight
-  const fmt = formatCurrency
-
-  return (
-    <div className={`flex items-center gap-3 px-4 py-3 transition-colors group rounded-lg ${selected ? 'bg-teal-400/10' : 'hover:bg-[#1f2233]'}`}>
-      {canWrite && (
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelect(tx.id)}
-          className="w-4 h-4 flex-shrink-0 accent-teal-400 cursor-pointer"
-          aria-label="Select transaction"
-        />
-      )}
-
-      <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
-        style={{ backgroundColor: cat.color + '22' }}
-      >
-        {cat.emoji}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-200 font-medium truncate">
-          {tx.description || <span className="text-gray-600 italic">No description</span>}
-        </p>
-        <p className="text-xs text-gray-500">{tx.date} · {cat.label}</p>
-        {tx.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {tx.tags.map((tag) => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-400/10 text-teal-400">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className={`amount-font text-sm font-semibold flex items-center gap-1 ${amountColor}`}>
-        <AmountIcon size={13} />
-        {fmt(tx.amount)}
-      </div>
-
-      {canWrite && (
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(tx)} className="p-1.5 rounded-md text-gray-500 hover:text-teal-400 hover:bg-teal-400/10 transition-colors cursor-pointer">
-            <Pencil size={13} />
-          </button>
-          <button onClick={() => onDelete(tx)} className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function TransactionList({ user, profile, ownerId, accountCanWrite = true, month, year, group, groups = [], onDeleteGroup }) {
   const [filters, setFilters] = useState({
     category: 'all',
@@ -120,8 +63,8 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
     dateTo: '',
   })
   const [page, setPage] = useState(1)
-  const [showForm, setShowForm] = useState(false)
-  const [editTx, setEditTx] = useState(null)
+  const [showForm, setShowForm] = useState(false)   // add-only; edits happen inline
+  const [editingId, setEditingId] = useState(null)  // id of the row being edited in place
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [pendingDelete, setPendingDelete] = useState(null) // array of ids awaiting confirmation
   const [confirmGroupDelete, setConfirmGroupDelete] = useState(false)
@@ -135,6 +78,8 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
   const canWrite = group ? group.access !== 'viewer' : accountCanWrite
   const isOwner = group ? group.access === 'owner' : false  // only a group owner can share / delete it
   const writeOwnerId = group ? group.user_id : ownerId       // inserts are attributed to this owner
+
+  const { tags: tagSuggestions, refetch: refetchTags } = useTransactionTags(ownerId)
 
   const { transactions, count, loading, refetch } = useTransactions({
     userId: ownerId,
@@ -197,15 +142,16 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
 
   const handleSaved = () => {
     setShowForm(false)
-    setEditTx(null)
+    setEditingId(null)
     setTick((t) => t + 1)
     refetch()
+    refetchTags() // a new tag typed inline should show up in autocomplete
   }
 
-  const handleEdit = (tx) => {
-    setEditTx(tx)
-    setShowForm(true)
-  }
+  // Columns rendered, for the error row's colSpan. In a group view every row
+  // belongs to that group, so the Group column is dropped.
+  const showGroup = !group && groups.length > 0
+  const columnCount = 8 + (showGroup ? 1 : 0) + (canWrite ? 2 : 0)
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4 fade-in">
@@ -217,7 +163,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
               <h1 className="text-lg font-semibold text-white">{group.name}</h1>
               {group.shared && (
                 <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#1f2233] text-gray-400">
-                  Shared · {access}
+                  Shared · {group.access}
                 </span>
               )}
             </div>
@@ -262,7 +208,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
         </p>
         <div className="flex gap-2">
           <button
-            onClick={() => exportCSV(transactions)}
+            onClick={() => exportCSV(transactions, groups)}
             disabled={transactions.length === 0}
             className="btn-secondary flex items-center gap-2 text-sm py-1.5 disabled:opacity-40"
           >
@@ -278,7 +224,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
           )}
           {canWrite && (
             <button
-              onClick={() => { setEditTx(null); setShowForm(true) }}
+              onClick={() => { setEditingId(null); setShowForm(true) }}
               className="btn-primary flex items-center gap-2 text-sm py-1.5"
             >
               <Plus size={14} /> Add
@@ -331,18 +277,53 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
             <p className="text-xs text-gray-700 mt-1">Try changing your filters or add one</p>
           </div>
         ) : (
-          <div className="p-2">
-            {transactions.map((tx) => (
-              <TransactionRow
-                key={tx.id}
-                tx={tx}
-                onEdit={handleEdit}
-                onDelete={(t) => setPendingDelete([t.id])}
-                selected={selectedIds.has(tx.id)}
-                onToggleSelect={toggleSelect}
-                canWrite={canWrite}
-              />
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[#2a2d3a]">
+                  {canWrite && <th className="px-3 py-2 w-8" />}
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Date</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Description</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Category</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Tags</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Notes</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Type</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Account</th>
+                  {showGroup && <th className="text-left px-3 py-2 text-gray-500 font-medium">Group</th>}
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Amount</th>
+                  {canWrite && <th className="px-3 py-2 w-16" />}
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx) =>
+                  editingId === tx.id ? (
+                    <EditRow
+                      key={tx.id}
+                      tx={tx}
+                      groups={groups}
+                      canWrite={canWrite}
+                      showGroup={showGroup}
+                      tagSuggestions={tagSuggestions}
+                      colSpan={columnCount}
+                      onCancel={() => setEditingId(null)}
+                      onSaved={handleSaved}
+                    />
+                  ) : (
+                    <DisplayRow
+                      key={tx.id}
+                      tx={tx}
+                      groups={groups}
+                      canWrite={canWrite}
+                      showGroup={showGroup}
+                      selected={selectedIds.has(tx.id)}
+                      onToggleSelect={toggleSelect}
+                      onEdit={(t) => setEditingId(t.id)}
+                      onDelete={(t) => setPendingDelete([t.id])}
+                    />
+                  )
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -376,11 +357,10 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
         <TransactionForm
           user={user}
           ownerId={writeOwnerId}
-          transaction={editTx}
           groups={groups}
           defaultGroupId={group?.id}
           onSaved={handleSaved}
-          onClose={() => { setShowForm(false); setEditTx(null) }}
+          onClose={() => setShowForm(false)}
         />
       )}
 
