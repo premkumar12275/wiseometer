@@ -16,14 +16,27 @@ create policy "own profile read" on profiles
 create policy "own profile write" on profiles
   for all using (id = auth.uid()) with check (id = auth.uid());
 
+-- NOTE: every `security definer` function below pins `set search_path` and
+-- schema-qualifies its tables. This is load-bearing, not style: functions
+-- reached from the Auth signup path run as `supabase_auth_admin`, whose
+-- search_path excludes `public`, so an unqualified reference fails with a
+-- bogus "relation does not exist" and aborts signup. An unpinned search_path
+-- is also a privilege-escalation vector. `extensions` is in the path because
+-- citext (used by username / invitee_email) lives there on Supabase.
 create or replace function username_available(u text)
-returns boolean language sql security definer stable as $$
-  select not exists (select 1 from profiles where username = lower(u));
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
+  select not exists (select 1 from public.profiles where username = lower(u));
 $$;
 grant execute on function username_available(text) to anon, authenticated;
 
 create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
 begin
   if new.raw_user_meta_data ? 'username' then
     insert into public.profiles (id, username, name, email)
@@ -208,17 +221,21 @@ create policy acc_share_invitee_read on account_shares for select
 
 create or replace function find_user(identifier text)
 returns table (id uuid, username citext, name text, email text)
-language sql security definer stable as $$
-  select id, username, name, email from profiles
+language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
+  select id, username, name, email from public.profiles
   where username = identifier or lower(email) = lower(identifier)
   limit 1;
 $$;
 grant execute on function find_user(text) to authenticated;
 
 create or replace function can_read_account(p_owner uuid)
-returns boolean language sql security definer stable as $$
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
   select p_owner = auth.uid()
-      or exists (select 1 from account_shares
+      or exists (select 1 from public.account_shares
                  where owner_id = p_owner
                    and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
 $$;
@@ -226,47 +243,61 @@ $$;
 -- Distinct tags already used on an owner's transactions, for tag-entry
 -- autocomplete.
 create or replace function get_transaction_tags(p_owner uuid)
-returns text[] language sql security definer stable as $$
+returns text[] language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
   select coalesce(array_agg(distinct tag order by tag), '{}'::text[])
-  from transactions, unnest(tags) as tag
-  where transactions.user_id = p_owner and can_read_account(p_owner);
+  from public.transactions, unnest(tags) as tag
+  where transactions.user_id = p_owner and public.can_read_account(p_owner);
 $$;
 grant execute on function get_transaction_tags(uuid) to authenticated;
 
 create or replace function can_write_account(p_owner uuid)
-returns boolean language sql security definer stable as $$
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
   select p_owner = auth.uid()
-      or exists (select 1 from account_shares
+      or exists (select 1 from public.account_shares
                  where owner_id = p_owner and role = 'editor'
                    and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
 $$;
 
 create or replace function group_owner(p_group uuid)
-returns uuid language sql security definer stable as $$ select user_id from groups where id = p_group; $$;
+returns uuid language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$ select user_id from public.groups where id = p_group; $$;
 
 create or replace function is_group_invitee(p_group uuid)
-returns boolean language sql security definer stable as $$
-  select exists (select 1 from group_shares
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
+  select exists (select 1 from public.group_shares
                  where group_id = p_group
                    and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
 $$;
 
 create or replace function shares_group_of_owner(p_owner uuid)
-returns boolean language sql security definer stable as $$
-  select exists (select 1 from group_shares gs join groups g on g.id = gs.group_id
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
+  select exists (select 1 from public.group_shares gs join public.groups g on g.id = gs.group_id
                  where g.user_id = p_owner
                    and (gs.invitee_id = auth.uid() or gs.invitee_email = auth.jwt() ->> 'email'));
 $$;
 
 create or replace function can_read_group(p_group uuid)
-returns boolean language sql security definer stable as $$
-  select can_read_account(group_owner(p_group)) or is_group_invitee(p_group);
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
+  select public.can_read_account(public.group_owner(p_group)) or public.is_group_invitee(p_group);
 $$;
 
 create or replace function can_write_group(p_group uuid)
-returns boolean language sql security definer stable as $$
-  select can_write_account(group_owner(p_group))
-      or exists (select 1 from group_shares
+returns boolean language sql security definer stable
+set search_path = public, extensions, pg_temp
+as $$
+  select public.can_write_account(public.group_owner(p_group))
+      or exists (select 1 from public.group_shares
                  where group_id = p_group and role = 'editor'
                    and (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email'));
 $$;
@@ -277,13 +308,21 @@ create policy grp_share_owner on group_shares for all
 create policy grp_share_invitee_read on group_shares for select
   using (invitee_id = auth.uid() or invitee_email = auth.jwt() ->> 'email');
 
+-- Runs during Auth signup as `supabase_auth_admin`, whose search_path excludes
+-- `public` — so the table references MUST be schema-qualified and search_path
+-- pinned, or the trigger aborts the signup with a bogus "relation does not
+-- exist". Same reason handle_new_user writes to public.profiles.
 create or replace function backfill_shares()
-returns trigger language plpgsql security definer as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
 begin
-  update group_shares
+  update public.group_shares
      set invitee_id = new.id, invitee_username = new.username, invitee_name = new.name
    where invitee_id is null and lower(invitee_email) = lower(new.email);
-  update account_shares
+  update public.account_shares
      set invitee_id = new.id, invitee_username = new.username, invitee_name = new.name
    where invitee_id is null and lower(invitee_email) = lower(new.email);
   return new;
@@ -310,13 +349,16 @@ create policy tx_delete on transactions for delete using (
 -- transaction_history: logged by trigger (security definer), never written
 -- to directly by clients.
 create or replace function log_transaction_change()
-returns trigger language plpgsql security definer as $$
+returns trigger
+language plpgsql security definer
+set search_path = public, extensions, pg_temp
+as $$
 declare
   v_username citext;
   v_name text;
 begin
-  select username, name into v_username, v_name from profiles where id = auth.uid();
-  insert into transaction_history
+  select username, name into v_username, v_name from public.profiles where id = auth.uid();
+  insert into public.transaction_history
     (transaction_id, owner_id, group_id, action, changed_by, changed_by_username, changed_by_name, old_data, new_data)
   values (
     coalesce(new.id, old.id),
