@@ -14,6 +14,7 @@ import {
   Shapes,
   History,
   PiggyBank,
+  BarChart3,
 } from 'lucide-react'
 import { version } from '../../../package.json'
 import { authService } from '../../services/authService'
@@ -23,6 +24,7 @@ import ChangelogModal from './ChangelogModal'
 const NAV_ITEMS = [
   { id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions',  icon: List },
+  { id: 'reports',      label: 'Reports',       icon: BarChart3 },
   { id: 'import',       label: 'Import',        icon: Upload },
   { id: 'categories',   label: 'Categories',    icon: Shapes },
   { id: 'activity',     label: 'Activity',      icon: History },

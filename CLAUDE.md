@@ -63,7 +63,17 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
   list shows — active filters applied, grouped rows included — and says so.
   Group views ignore the toggle: they stay all-time
 - Currency formatting and amount parsing live only in `src/utils/format.js`
-  (`formatCurrency`, `parseAmount`) — never inline `Intl.NumberFormat`
+  (`formatCurrency`, `formatCompact`, `parseAmount`) — never inline `Intl.NumberFormat`
+- The Reports page (`components/reports/`) reports on ONE scope at a time: the
+  top bar's month/year, or a group (all-time). It reuses the shared
+  `common/PeriodSummary` and adds a stacked bar chart — expenses per category,
+  each bar split by tag. `buildCategoryTagData` does the shaping: a multi-tag
+  transaction is SPLIT EVENLY between its tags so bars still total the category,
+  untagged spend gets its own reserved segment, and tags past the palette fold
+  into "Other tags". Tag colours come from `constants/chartPalette.js`, whose
+  slot ORDER is what keeps adjacent segments colourblind-safe — it was validated
+  against the card surface (#14171f); re-run the dataviz validator before
+  changing any value or order there
 - Date-only values from imports are normalized with `toISODate` in
   `src/utils/date.js` (local calendar date — never `toISOString` for date cells)
 - Environment variables loaded from `.env` — never hardcode keys

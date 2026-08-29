@@ -12,6 +12,7 @@ const PAGE_TITLES = {
   categories: 'Categories',
   activity: 'Activity',
   investments: 'Investments',
+  reports: 'Reports',
 }
 
 export default function TopBar({ currentPage, title, month, year, viewMode = 'month', onMonthChange, onViewModeChange }) {
@@ -31,9 +32,9 @@ export default function TopBar({ currentPage, title, month, year, viewMode = 'mo
   const isCurrentYear = year === now.getFullYear()
   const resetToToday = () => onMonthChange(now.getMonth() + 1, now.getFullYear())
 
-  // Dashboard and Transactions share the month/year period. A group view is
-  // all-time, so it gets neither toggle nor date picker.
-  const isPeriodPage = currentPage === 'dashboard' || currentPage === 'transactions'
+  // Dashboard, Transactions and Reports share the month/year period. A group
+  // view is all-time, so it gets neither toggle nor date picker.
+  const isPeriodPage = ['dashboard', 'transactions', 'reports'].includes(currentPage)
   const showYearPicker = isPeriodPage && viewMode === 'year'
 
   return (

@@ -1,5 +1,6 @@
 export const CATEGORIES = [
   { id: 'food',          label: 'Food',           emoji: '🍔', color: '#f97316' },
+  { id: 'groceries',     label: 'Groceries',       emoji: '🛒', color: '#84cc16' },
   { id: 'transport',     label: 'Transport',       emoji: '🚌', color: '#3b82f6' },
   { id: 'housing',       label: 'Housing',         emoji: '🏠', color: '#8b5cf6' },
   { id: 'entertainment', label: 'Entertainment',   emoji: '🎬', color: '#ec4899' },
@@ -17,7 +18,8 @@ export const CATEGORIES = [
 export const CATEGORY_KEYWORDS = {
   transfers:     ['overføring', 'overforing', 'transfer', 'nettgiro', 'mobilbank'],
   salary:        ['lønn', 'lonn', 'salary', 'payroll', 'wages', 'payment received'],
-  food:          ['rema', 'kiwi', 'meny', 'spar', 'coop', 'joker', 'mcdonald', 'burger', 'pizza', 'restaurant', 'cafe', 'grocery', 'narvesen', 'circle k', 'kaffe', 'butikkdri', 'vita'],
+  groceries:     ['rema', 'kiwi', 'meny', 'spar', 'coop', 'joker', 'bunnpris', 'matkroken', 'dagligvare', 'grocery', 'oda.com'],
+  food:          ['mcdonald', 'burger', 'pizza', 'restaurant', 'cafe', 'narvesen', 'circle k', 'kaffe', 'butikkdri', 'vita'],
   transport:     ['nsb', 'vy', 'ruter', 'bolt', 'uber', 'flytoget', 'atb', 'kolumbus', 'taxi', 'bus', 'train', 'metro', 'easypark', 'parkering', 'parkerings'],
   entertainment: ['netflix', 'spotify', 'hbo', 'viaplay', 'steam', 'gaming', 'cinema', 'movie', 'concert', 'disney', 'norway chess'],
   health:        ['apotek', 'boots', 'vitusapotek', 'lege', 'tannlege', 'clinic', 'pharmacy', 'hospital', 'doctor', 'gym', 'fitness', 'sats'],

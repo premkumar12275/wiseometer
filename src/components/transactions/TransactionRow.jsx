@@ -25,9 +25,16 @@ export function DisplayRow({ tx, groups, selected, onToggleSelect, onEdit, onDel
   const groupName = groups.find((g) => g.id === tx.group_id)?.name
 
   return (
-    <tr className={`border-b border-[#2a2d3a]/50 last:border-0 transition-colors group ${selected ? 'bg-teal-400/10' : 'hover:bg-[#1f2233]'}`}>
+    <tr
+      // Double-click anywhere on the row opens it for editing, the same as the
+      // pencil. The checkbox and action cells opt out below so a quick
+      // double-tick or a double-clicked button doesn't drop into edit mode.
+      onDoubleClick={canWrite ? () => onEdit(tx) : undefined}
+      title={canWrite ? 'Double-click to edit' : undefined}
+      className={`border-b border-[#2a2d3a]/50 last:border-0 transition-colors group ${selected ? 'bg-teal-400/10' : 'hover:bg-[#1f2233]'}`}
+    >
       {canWrite && (
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-2.5" onDoubleClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={selected}
@@ -100,7 +107,7 @@ export function DisplayRow({ tx, groups, selected, onToggleSelect, onEdit, onDel
       </td>
 
       {canWrite && (
-        <td className="px-3 py-2.5">
+        <td className="px-3 py-2.5" onDoubleClick={(e) => e.stopPropagation()}>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
             <button
               onClick={() => onEdit(tx)}

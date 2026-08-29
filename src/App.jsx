@@ -14,6 +14,7 @@ import TransactionList from './components/transactions/TransactionList'
 import ImportWizard from './components/import/ImportWizard'
 import CategoriesManager from './components/categories/CategoriesManager'
 import ActivityLog from './components/activity/ActivityLog'
+import ReportsPage from './components/reports/ReportsPage'
 import InvestmentsList from './components/investments/InvestmentsList'
 
 function LoadingScreen() {
@@ -135,6 +136,16 @@ function Workspace({ user, profile }) {
                   }}
                 />
               ) : <ViewerNotice />
+            )}
+            {page === 'reports' && (
+              <ReportsPage
+                key={ownerId}
+                ownerId={ownerId}
+                month={month}
+                year={year}
+                viewMode={viewMode}
+                groups={groups}
+              />
             )}
             {page === 'categories' && <CategoriesManager canWrite={canWrite} />}
             {page === 'activity' && <ActivityLog key={ownerId} ownerId={ownerId} groups={groups} />}

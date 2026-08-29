@@ -11,6 +11,16 @@ const currencyFormatter = new Intl.NumberFormat(LOCALE, {
 // Format a number as a currency string (e.g. "kr 1 234,56").
 export const formatCurrency = (n) => currencyFormatter.format(n || 0)
 
+const compactFormatter = new Intl.NumberFormat(LOCALE, {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+
+// Compact amount for dense contexts like chart axis ticks, where the full
+// currency string collides with its neighbours. Never for a figure the user is
+// meant to read exactly — use formatCurrency there.
+export const formatCompact = (n) => compactFormatter.format(n || 0)
+
 /**
  * Parse a raw amount (number or string) into a positive number.
  *

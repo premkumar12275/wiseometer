@@ -62,6 +62,20 @@ export const storageService = {
     }
   },
 
+  // Every row the filters match, unpaged — for reporting, which has to see the
+  // whole set to break spending down by category and tag.
+  getAllFilteredTransactions: async (filters) => {
+    try {
+      let query = supabase.from('transactions').select('*').order('date', { ascending: false })
+      query = storageService.applyTransactionFilters(query, filters).range(0, 9999)
+
+      const { data, error } = await query
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
   // Totals across EVERY row the current filters match, not just the visible
   // page. Aggregated client-side like the dashboard summaries; the explicit
   // range lifts PostgREST's default row cap for a busy year.

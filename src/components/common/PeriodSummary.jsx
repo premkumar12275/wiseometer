@@ -20,10 +20,10 @@ function Stat({ label, value, icon: Icon, color, loading }) {
 }
 
 /**
- * Condensed version of the dashboard's summary cards, for the transactions
- * screen. Unlike the dashboard it totals exactly what the list is showing —
- * the active filters included, and grouped rows counted in — so the figures
- * always describe the rows underneath them.
+ * Condensed version of the dashboard's summary cards, shared by the
+ * transactions screen and reports. Unlike the dashboard it totals exactly what
+ * the surface below it is showing — active filters included, grouped rows
+ * counted in — so the figures always describe the rows underneath them.
  */
 export default function PeriodSummary({ totals, periodLabel, loading, filtered }) {
   const hasTransfers = (totals?.transfers ?? 0) > 0
