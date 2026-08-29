@@ -57,7 +57,15 @@ export default function TagInput({ value = [], onChange, suggestions = [], place
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 100)}
+            onBlur={() => {
+              // Commit whatever has been typed but not yet turned into a chip.
+              // Without this, typing a tag and going straight for Save (rather
+              // than pressing Enter first) silently discards it. Clicking a
+              // suggestion can't double-add: those swallow the blur via
+              // onMouseDown preventDefault.
+              addTag(input)
+              setTimeout(() => setShowSuggestions(false), 100)
+            }}
             placeholder={value.length === 0 ? placeholder : ''}
             className={`flex-1 min-w-[60px] bg-transparent outline-none text-gray-200 placeholder-gray-600 ${compact ? 'text-[11px]' : 'text-sm'}`}
           />
