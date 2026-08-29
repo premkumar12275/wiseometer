@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { storageService } from '../../services/storageService'
+import { SUPPORTED_CURRENCIES } from '../../utils/format'
 import { X } from 'lucide-react'
 
 /**
@@ -10,6 +11,7 @@ import { X } from 'lucide-react'
 export default function InvestmentFolderForm({ user, ownerId, folder, onSaved, onClose }) {
   const [name, setName] = useState(folder?.name || '')
   const [target, setTarget] = useState(folder?.target_amount != null ? String(folder.target_amount) : '')
+  const [currency, setCurrency] = useState(folder?.currency || 'NOK')
   const [notes, setNotes] = useState(folder?.notes || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -35,6 +37,7 @@ export default function InvestmentFolderForm({ user, ownerId, folder, onSaved, o
       user_id: ownerId || user.id,
       name: name.trim(),
       target_amount: targetAmount,
+      currency,
       notes: notes.trim() || null,
     }
     const result = folder
@@ -77,17 +80,29 @@ export default function InvestmentFolderForm({ user, ownerId, folder, onSaved, o
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
               Target amount <span className="text-gray-600 normal-case">(optional)</span>
             </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className="input-field amount-font"
-              placeholder="e.g. the full price of the house"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="input-field amount-font flex-1"
+                placeholder="e.g. the full price of the house"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              />
+              <select
+                className="input-field w-24"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.code}</option>
+                ))}
+              </select>
+            </div>
             <p className="text-[11px] text-gray-600 mt-1.5">
-              What the folder is working towards. Progress is shown against it.
+              What the folder is working towards. Progress counts only holdings in this
+              currency — nothing is converted.
             </p>
           </div>
 

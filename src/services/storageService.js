@@ -687,17 +687,13 @@ export const storageService = {
         }
       })
 
-      const invested = investments.reduce((sum, i) => sum + i.invested, 0)
-      const currentValue = investments.reduce((sum, i) => sum + parseFloat(i.current_value), 0)
-      const gainLoss = currentValue - invested
-      const gainLossPct = invested > 0 ? (gainLoss / invested) * 100 : 0
+      // Totals are per currency and never converted — the app holds no exchange
+      // rate, so summing NOK and USD into one figure would be a fabrication.
+      const currencies = storageService.totalsByCurrency(investments)
 
       return {
         data: {
-          invested,
-          currentValue,
-          gainLoss,
-          gainLossPct,
+          currencies,
           investments,
           folders: folderRows.data || [],
         },
@@ -706,6 +702,29 @@ export const storageService = {
     } catch (err) {
       return { data: null, error: err }
     }
+  },
+
+  /**
+   * Split a set of investments into one total per currency, biggest holding
+   * first. Shared by the Investments page, its folder headers and the Dashboard
+   * card, so they can never disagree about what a portfolio is worth.
+   */
+  totalsByCurrency: (investments) => {
+    const buckets = {}
+    for (const inv of investments) {
+      const code = inv.currency || 'NOK'
+      const b = (buckets[code] ||= { currency: code, count: 0, invested: 0, currentValue: 0 })
+      b.count += 1
+      b.invested += inv.invested ?? (parseFloat(inv.amount_invested) || 0)
+      b.currentValue += parseFloat(inv.current_value) || 0
+    }
+    return Object.values(buckets)
+      .map((b) => ({
+        ...b,
+        gainLoss: b.currentValue - b.invested,
+        gainLossPct: b.invested > 0 ? ((b.currentValue - b.invested) / b.invested) * 100 : 0,
+      }))
+      .sort((a, b) => b.currentValue - a.currentValue)
   },
 
   // ─── Investment folders ─────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { INVESTMENT_TYPES } from '../../constants/investmentTypes'
 import { storageService } from '../../services/storageService'
-import { formatCurrency } from '../../utils/format'
+import { formatIn, SUPPORTED_CURRENCIES } from '../../utils/format'
 import { FREQUENCIES, planProgress } from '../../utils/investmentPlan'
 import ContributionScheduleEditor from './ContributionScheduleEditor'
 import { X } from 'lucide-react'
@@ -17,6 +17,7 @@ const EMPTY = {
   amountInvested: '',
   currentValue: '',
   notes: '',
+  currency: 'NOK',
   folderId: '',
   isRecurring: false,
   frequency: 'monthly',
@@ -35,6 +36,7 @@ export default function InvestmentForm({ user, ownerId, investment, folders = []
     amountInvested: String(investment.amount_invested),
     currentValue: String(investment.current_value),
     notes: investment.notes || '',
+    currency: investment.currency || 'NOK',
     folderId: investment.folder_id || '',
     isRecurring: !!investment.is_recurring,
     frequency: investment.frequency || 'monthly',
@@ -136,6 +138,7 @@ export default function InvestmentForm({ user, ownerId, investment, folders = []
       amount_invested: amountInvested,
       current_value: currentValue,
       notes: form.notes.trim() || null,
+      currency: form.currency,
       folder_id: form.folderId || null,
       is_recurring: form.isRecurring,
       frequency: form.isRecurring ? form.frequency : null,
@@ -196,20 +199,34 @@ export default function InvestmentForm({ user, ownerId, investment, folders = []
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Type */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Type</label>
-            <select
-              className="input-field"
-              value={form.type}
-              onChange={(e) => set('type', e.target.value)}
-            >
-              {INVESTMENT_TYPES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.emoji} {t.label}
-                </option>
-              ))}
-            </select>
+          {/* Type + currency */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Type</label>
+              <select
+                className="input-field"
+                value={form.type}
+                onChange={(e) => set('type', e.target.value)}
+              >
+                {INVESTMENT_TYPES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.emoji} {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Currency</label>
+              <select
+                className="input-field"
+                value={form.currency}
+                onChange={(e) => set('currency', e.target.value)}
+              >
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Name */}
@@ -364,7 +381,7 @@ export default function InvestmentForm({ user, ownerId, investment, folders = []
                 <div className="rounded-lg bg-[#1a1d27] px-3 py-2.5">
                   <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">Paid so far</p>
                   <p className="amount-font text-base font-semibold text-white">
-                    {formatCurrency(preview.invested)}
+                    {formatIn(preview.invested, form.currency)}
                   </p>
                   <p className="text-[11px] text-gray-600 mt-0.5">
                     {preview.periods} payment{preview.periods !== 1 ? 's' : ''}

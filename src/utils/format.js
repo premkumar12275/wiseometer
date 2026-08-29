@@ -22,6 +22,36 @@ const compactFormatter = new Intl.NumberFormat(LOCALE, {
 export const formatCompact = (n) => compactFormatter.format(n || 0)
 
 /**
+ * Currencies the PORTFOLIO can hold. The expense ledger is NOK-only — these
+ * apply to investments alone.
+ *
+ * Amounts are never converted between them: the app has no exchange rate and
+ * inventing one would turn every total into a guess. Totals are reported per
+ * currency instead.
+ */
+export const SUPPORTED_CURRENCIES = [
+  { code: 'NOK', label: 'Norwegian Krone', symbol: 'kr', locale: 'nb-NO' },
+  { code: 'USD', label: 'US Dollar', symbol: '$', locale: 'en-US' },
+  { code: 'INR', label: 'Indian Rupee', symbol: '₹', locale: 'en-IN' },
+]
+
+export const getCurrency = (code) =>
+  SUPPORTED_CURRENCIES.find((c) => c.code === code) || SUPPORTED_CURRENCIES[0]
+
+// Built lazily and reused — Intl.NumberFormat is expensive to construct and
+// these are called once per row.
+const byCurrency = new Map()
+
+// Format an amount in a specific currency, in that currency's own locale.
+export const formatIn = (n, code = CURRENCY) => {
+  if (!byCurrency.has(code)) {
+    const c = getCurrency(code)
+    byCurrency.set(code, new Intl.NumberFormat(c.locale, { style: 'currency', currency: c.code }))
+  }
+  return byCurrency.get(code).format(n || 0)
+}
+
+/**
  * Parse a raw amount (number or string) into a positive number.
  *
  * Handles the Norwegian convention — comma decimal, space/period thousands,

@@ -77,7 +77,14 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
   list shows — active filters applied, grouped rows included — and says so.
   Group views ignore the toggle: they stay all-time
 - Currency formatting and amount parsing live only in `src/utils/format.js`
-  (`formatCurrency`, `formatCompact`, `parseAmount`) — never inline `Intl.NumberFormat`
+  (`formatCurrency`, `formatCompact`, `formatIn`, `parseAmount`) — never inline
+  `Intl.NumberFormat`
+- The expense ledger is NOK-only. INVESTMENTS are multi-currency (NOK/USD/INR,
+  `SUPPORTED_CURRENCIES` in format.js + a DB check constraint — adding one needs a
+  migration). Amounts are NEVER converted: the app holds no exchange rate, so
+  portfolio totals are reported PER CURRENCY via `storageService.totalsByCurrency`
+  and there is deliberately no single portfolio figure anywhere. Render investment
+  amounts with `formatIn(n, inv.currency)`, never `formatCurrency`
 - The Reports page (`components/reports/`) reports on ONE scope at a time: the
   top bar's month/year, or a group (all-time). It reuses the shared
   `common/PeriodSummary` and adds a stacked bar chart — expenses per category,

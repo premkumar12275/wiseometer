@@ -6,6 +6,7 @@ import { toISODate } from '../../utils/date'
 import UploadStep from '../import/UploadStep'
 import InvestmentColumnMapper from './InvestmentColumnMapper'
 import InvestmentReview from './InvestmentReview'
+import { SUPPORTED_CURRENCIES } from '../../utils/format'
 import { CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
 
 const STEPS = ['Upload', 'Map Columns', 'Review', 'Complete']
@@ -44,6 +45,7 @@ export default function InvestmentImportWizard({ user, ownerId, onImported, onCl
   const [headers, setHeaders] = useState([])
   const [rawRows, setRawRows] = useState([])
   const [reviewRows, setReviewRows] = useState([])
+  const [currency, setCurrency] = useState('NOK')
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState(null)
   const [parseError, setParseError] = useState('')
@@ -100,6 +102,7 @@ export default function InvestmentImportWizard({ user, ownerId, onImported, onCl
       amount_invested: r.amountInvested,
       current_value: r.currentValue,
       notes: r.notes || null,
+      currency,
       source: 'import',
     }))
 
@@ -167,7 +170,23 @@ export default function InvestmentImportWizard({ user, ownerId, onImported, onCl
                   <p className="text-sm">Importing investments…</p>
                 </div>
               ) : (
-                <InvestmentReview rows={reviewRows} onConfirmed={handleConfirmed} />
+                <>
+                  {/* A statement is denominated in one currency, so this is set
+                      once for the whole file rather than per row. */}
+                  <label className="flex items-center gap-2 mb-3 text-xs text-gray-400">
+                    Currency for these holdings
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="bg-[#1f2233] border border-[#2a2d3a] rounded px-2 py-1 text-xs text-gray-200 outline-none focus:border-teal-400 cursor-pointer"
+                    >
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <InvestmentReview rows={reviewRows} onConfirmed={handleConfirmed} />
+                </>
               )}
             </>
           )}

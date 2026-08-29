@@ -157,6 +157,8 @@ create table investment_folders (
   user_id uuid references auth.users(id) on delete cascade,
   name text not null,
   target_amount numeric(14,2),
+  -- The target is denominated in this currency; amounts are never converted.
+  currency text not null default 'NOK' check (currency in ('NOK','USD','INR')),
   notes text,
   created_at timestamptz default now()
 );
@@ -170,6 +172,9 @@ create table investments (
   quantity numeric(14,4),
   amount_invested numeric(12,2) not null,
   current_value numeric(12,2) not null,
+  -- Portfolio only — the expense ledger is NOK-only. Never converted; totals
+  -- are reported per currency.
+  currency text not null default 'NOK' check (currency in ('NOK','USD','INR')),
   purchase_date date not null,          -- also the start date of a recurring plan
   notes text,
   folder_id uuid references investment_folders(id) on delete set null,

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useInvestments } from '../../hooks/useInvestments'
 import { storageService } from '../../services/storageService'
 import { getInvestmentTypeById } from '../../constants/investmentTypes'
-import { formatCurrency } from '../../utils/format'
+import { formatIn } from '../../utils/format'
 import { getFrequency } from '../../utils/investmentPlan'
 import InvestmentForm from './InvestmentForm'
 import InvestmentFolderForm from './InvestmentFolderForm'
@@ -36,6 +36,7 @@ function InvestmentRow({ inv, onEdit, onDelete, canWrite }) {
   const gainPct = invested > 0 ? (gain / invested) * 100 : 0
   const gainColor = gain >= 0 ? 'text-green-400' : 'text-red-400'
   const freq = inv.is_recurring ? getFrequency(inv.frequency) : null
+  const fmt = (n) => formatIn(n, inv.currency)
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-[#1f2233] transition-colors rounded-lg group">
@@ -62,7 +63,7 @@ function InvestmentRow({ inv, onEdit, onDelete, canWrite }) {
         </p>
         {inv.is_recurring ? (
           <p className="text-xs text-gray-500">
-            <span className="amount-font">{formatCurrency(inv.contribution_amount)}</span>{freq.per}
+            <span className="amount-font">{fmt(inv.contribution_amount)}</span>{freq.per}
             {' · '}{inv.progress?.periods ?? 0} payment{inv.progress?.periods !== 1 ? 's' : ''} since {inv.purchase_date}
             {inv.changes?.length > 0 && ` · ${inv.changes.length} change${inv.changes.length !== 1 ? 's' : ''}`}
           </p>
@@ -75,12 +76,12 @@ function InvestmentRow({ inv, onEdit, onDelete, canWrite }) {
       </div>
 
       <div className="text-right flex-shrink-0">
-        <p className="amount-font text-sm font-semibold text-white">{formatCurrency(inv.current_value)}</p>
+        <p className="amount-font text-sm font-semibold text-white">{fmt(inv.current_value)}</p>
         {inv.is_recurring ? (
-          <p className="amount-font text-xs text-gray-500">{formatCurrency(invested)} paid</p>
+          <p className="amount-font text-xs text-gray-500">{fmt(invested)} paid</p>
         ) : (
           <p className={`amount-font text-xs ${gainColor}`}>
-            {gain >= 0 ? '+' : ''}{formatCurrency(gain)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
+            {gain >= 0 ? '+' : ''}{fmt(gain)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
           </p>
         )}
       </div>
@@ -101,10 +102,17 @@ function InvestmentRow({ inv, onEdit, onDelete, canWrite }) {
 
 function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onDeleteFolder, onEdit, onDelete }) {
   const [open, setOpen] = useState(true)
-  const invested = investments.reduce((s, i) => s + (i.invested ?? parseFloat(i.amount_invested)), 0)
-  const currentValue = investments.reduce((s, i) => s + parseFloat(i.current_value), 0)
+  // One total per currency — a folder can legitimately hold a NOK account and
+  // an INR loan, and those must never be added together.
+  const totals = storageService.totalsByCurrency(investments)
+
+  // The target is denominated in the folder's currency, so progress counts only
+  // the holdings that share it.
   const target = folder?.target_amount != null ? parseFloat(folder.target_amount) : null
-  const pct = target > 0 ? Math.min(100, (invested / target) * 100) : null
+  const targetCurrency = folder?.currency || 'NOK'
+  const towardsTarget = totals.find((t) => t.currency === targetCurrency)?.invested || 0
+  const pct = target > 0 ? Math.min(100, (towardsTarget / target) * 100) : null
+  const otherCurrencies = totals.filter((t) => t.currency !== targetCurrency)
 
   return (
     <div className="card overflow-hidden">
@@ -122,9 +130,13 @@ function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onD
             {folder ? folder.name : 'Ungrouped'}
           </h3>
 
-          <span className="text-xs text-gray-500 amount-font">
-            {formatCurrency(invested)} in · {formatCurrency(currentValue)} now
-          </span>
+          <div className="text-xs text-gray-500 text-right">
+            {totals.length === 0 ? '—' : totals.map((t) => (
+              <p key={t.currency} className="amount-font whitespace-nowrap">
+                {formatIn(t.invested, t.currency)} in · {formatIn(t.currentValue, t.currency)} now
+              </p>
+            ))}
+          </div>
 
           {canWrite && folder && (
             <div className="flex gap-1">
@@ -156,14 +168,20 @@ function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onD
           <div className="mt-2.5 pl-[26px]">
             <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
               <span>
-                <span className="amount-font text-gray-300">{formatCurrency(invested)}</span> of{' '}
-                <span className="amount-font">{formatCurrency(target)}</span>
+                <span className="amount-font text-gray-300">{formatIn(towardsTarget, targetCurrency)}</span> of{' '}
+                <span className="amount-font">{formatIn(target, targetCurrency)}</span>
               </span>
               <span className="amount-font">{pct.toFixed(1)}%</span>
             </div>
             <div className="h-1.5 rounded-full bg-[#1f2233] overflow-hidden">
               <div className="h-full rounded-full bg-teal-400" style={{ width: `${pct}%` }} />
             </div>
+            {otherCurrencies.length > 0 && (
+              <p className="text-[11px] text-gray-600 mt-1.5">
+                Excludes {otherCurrencies.map((t) => formatIn(t.invested, t.currency)).join(' and ')} in
+                other currencies — nothing is converted.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -186,8 +204,7 @@ function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onD
 }
 
 export default function InvestmentsList({ user, ownerId, canWrite = true }) {
-  const { investments, folders, invested, currentValue, gainLoss, gainLossPct, loading, refetch } =
-    useInvestments(ownerId)
+  const { investments, folders, currencies, loading, refetch } = useInvestments(ownerId)
   const [showForm, setShowForm] = useState(false)
   const [editInv, setEditInv] = useState(null)
   const [formFolderId, setFormFolderId] = useState('')
@@ -196,7 +213,6 @@ export default function InvestmentsList({ user, ownerId, canWrite = true }) {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [pendingFolderDelete, setPendingFolderDelete] = useState(null)
   const [showImport, setShowImport] = useState(false)
-  const gainColor = gainLoss >= 0 ? 'text-green-400' : 'text-red-400'
 
   const handleSaved = () => {
     setShowForm(false)
@@ -234,16 +250,20 @@ export default function InvestmentsList({ user, ownerId, canWrite = true }) {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4 fade-in">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <p className="text-sm text-gray-500">
-          {loading ? '—' : (
-            <>
-              {formatCurrency(currentValue)} current · {formatCurrency(invested)} invested ·{' '}
-              <span className={gainColor}>
-                {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss)} ({gainLossPct >= 0 ? '+' : ''}{gainLossPct.toFixed(1)}%)
+        {/* One row per currency held. Amounts are never converted, so there is
+            deliberately no single portfolio figure here. */}
+        <div className="text-sm text-gray-500 space-y-0.5">
+          {loading ? '—' : currencies.length === 0 ? 'Nothing tracked yet' : currencies.map((c) => (
+            <p key={c.currency}>
+              <span className="text-[10px] uppercase tracking-wide text-gray-600 mr-1.5">{c.currency}</span>
+              {formatIn(c.currentValue, c.currency)} current · {formatIn(c.invested, c.currency)} invested ·{' '}
+              <span className={c.gainLoss >= 0 ? 'text-green-400' : 'text-red-400'}>
+                {c.gainLoss >= 0 ? '+' : ''}{formatIn(c.gainLoss, c.currency)}
+                {' '}({c.gainLossPct >= 0 ? '+' : ''}{c.gainLossPct.toFixed(1)}%)
               </span>
-            </>
-          )}
-        </p>
+            </p>
+          ))}
+        </div>
         {canWrite && (
           <div className="flex gap-2">
             <button
