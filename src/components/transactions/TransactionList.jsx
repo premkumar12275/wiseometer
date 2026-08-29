@@ -7,11 +7,15 @@ import TransactionFilters from './TransactionFilters'
 import TransactionForm from './TransactionForm'
 import { DisplayRow, EditRow } from './TransactionRow'
 import BulkEditModal from './BulkEditModal'
+import PeriodSummary from './PeriodSummary'
 import ImportWizard from '../import/ImportWizard'
 import ShareGroupModal from '../groups/ShareGroupModal'
 import { Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
 
 const PAGE_SIZE = 20
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December']
 
 function exportCSV(transactions, groups = []) {
   const csvText = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
@@ -55,7 +59,7 @@ function ConfirmDelete({ count = 1, title, message, onConfirm, onCancel }) {
   )
 }
 
-export default function TransactionList({ user, profile, ownerId, accountCanWrite = true, month, year, group, groups = [], onDeleteGroup }) {
+export default function TransactionList({ user, profile, ownerId, accountCanWrite = true, month, year, viewMode = 'month', group, groups = [], onDeleteGroup }) {
   const [filters, setFilters] = useState({
     category: 'all',
     type: 'all',
@@ -83,10 +87,11 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
 
   const { tags: tagSuggestions, refetch: refetchTags } = useTransactionTags(ownerId)
 
-  const { transactions, count, loading, refetch } = useTransactions({
+  const { transactions, count, totals, loading, refetch } = useTransactions({
     userId: ownerId,
     month,
     year,
+    viewMode,
     category: filters.category,
     type: filters.type,
     search: filters.search,
@@ -108,6 +113,12 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
+
+  // A new period is a different result set — go back to the first page.
+  useEffect(() => {
+    setPage(1)
+    setSelectedIds(new Set())
+  }, [month, year, viewMode])
 
   // Selection is scoped to the current page — cleared whenever the rows change.
   const clearSelection = () => setSelectedIds(new Set())
@@ -154,6 +165,15 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
   // belongs to that group, so the Group column is dropped.
   const showGroup = !group && groups.length > 0
   const columnCount = 8 + (showGroup ? 1 : 0) + (canWrite ? 2 : 0)
+
+  const hasActiveFilters =
+    filters.category !== 'all' || filters.type !== 'all' ||
+    !!filters.search || !!filters.dateFrom || !!filters.dateTo
+
+  // An explicit From/To range overrides the period, so the label has to follow.
+  const periodLabel = filters.dateFrom || filters.dateTo
+    ? 'Selected range'
+    : viewMode === 'year' ? String(year) : `${MONTHS[month - 1]} ${year}`
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4 fade-in">
@@ -234,6 +254,15 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
           )}
         </div>
       </div>
+
+      {!group && (
+        <PeriodSummary
+          totals={totals}
+          periodLabel={periodLabel}
+          loading={loading}
+          filtered={hasActiveFilters}
+        />
+      )}
 
       <TransactionFilters filters={filters} onChange={onFiltersChange} />
 

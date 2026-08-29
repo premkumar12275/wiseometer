@@ -31,15 +31,17 @@ export default function TopBar({ currentPage, title, month, year, viewMode = 'mo
   const isCurrentYear = year === now.getFullYear()
   const resetToToday = () => onMonthChange(now.getMonth() + 1, now.getFullYear())
 
-  const isDashboard = currentPage === 'dashboard'
-  const showYearPicker = isDashboard && viewMode === 'year'
+  // Dashboard and Transactions share the month/year period. A group view is
+  // all-time, so it gets neither toggle nor date picker.
+  const isPeriodPage = currentPage === 'dashboard' || currentPage === 'transactions'
+  const showYearPicker = isPeriodPage && viewMode === 'year'
 
   return (
     <header className="h-14 bg-[#14171f] border-b border-[#2a2d3a] flex items-center px-6 gap-4 flex-shrink-0">
       <h1 className="text-base font-semibold text-white flex-1">{title || PAGE_TITLES[currentPage] || ''}</h1>
 
-      {/* Month/Year toggle — dashboard only */}
-      {isDashboard && (
+      {/* Month/Year toggle — pages that are scoped to a period */}
+      {isPeriodPage && (
         <div className="flex items-center bg-[#1f2233] rounded-lg p-0.5 text-xs">
           <button
             onClick={() => onViewModeChange('month')}
@@ -61,7 +63,7 @@ export default function TopBar({ currentPage, title, month, year, viewMode = 'mo
       )}
 
       {/* Date picker — only show on dashboard + transactions */}
-      {(currentPage === 'dashboard' || currentPage === 'transactions') && (
+      {isPeriodPage && (
         <div className="flex items-center gap-2">
           {showYearPicker ? (
             <>

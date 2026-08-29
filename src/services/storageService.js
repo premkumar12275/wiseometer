@@ -3,7 +3,45 @@ import { supabase } from '../lib/supabaseClient'
 export const storageService = {
   // ─── Transactions ───────────────────────────────────────────────────────────
 
-  getTransactions: async ({ userId, month, year, category, type, search, dateFrom, dateTo, groupId, page = 1, pageSize = 20 }) => {
+  // Scope + filters shared by the paged list and its totals, so the summary
+  // strip can never drift from the rows it is summarising.
+  applyTransactionFilters: (query, { userId, month, year, viewMode, category, type, search, dateFrom, dateTo, groupId }) => {
+    // A group view is scoped by group_id (RLS allows shared groups, whose rows
+    // belong to the owner, not the viewer). Elsewhere, scope to the user's own
+    // account. Account-level sharing (Phase 2) will replace this with the
+    // active-account owner id.
+    if (groupId) {
+      query = query.eq('group_id', groupId)
+    } else {
+      query = query.eq('user_id', userId)
+    }
+
+    // An explicit From/To range overrides the period view so it can span
+    // months. A group view is all-time, so the period filter is skipped there too.
+    if (dateFrom || dateTo) {
+      if (dateFrom) query = query.gte('date', dateFrom)
+      if (dateTo) query = query.lte('date', dateTo)
+    } else if (viewMode === 'year' && year && !groupId) {
+      query = query.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`)
+    } else if (month && year && !groupId) {
+      const from = `${year}-${String(month).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month, 0).getDate()
+      const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
+      query = query.gte('date', from).lte('date', to)
+    }
+    if (category && category !== 'all') {
+      query = query.eq('category', category)
+    }
+    if (type && type !== 'all') {
+      query = query.eq('type', type)
+    }
+    if (search) {
+      query = query.ilike('description', `%${search}%`)
+    }
+    return query
+  },
+
+  getTransactions: async ({ page = 1, pageSize = 20, ...filters }) => {
     try {
       let query = supabase
         .from('transactions')
@@ -11,36 +49,7 @@ export const storageService = {
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
 
-      // A group view is scoped by group_id (RLS allows shared groups, whose rows
-      // belong to the owner, not the viewer). Elsewhere, scope to the user's own
-      // account. Account-level sharing (Phase 2) will replace this with the
-      // active-account owner id.
-      if (groupId) {
-        query = query.eq('group_id', groupId)
-      } else {
-        query = query.eq('user_id', userId)
-      }
-
-      // An explicit From/To range overrides the month/year view so it can span
-      // months. A group view is all-time, so the month filter is skipped there too.
-      if (dateFrom || dateTo) {
-        if (dateFrom) query = query.gte('date', dateFrom)
-        if (dateTo) query = query.lte('date', dateTo)
-      } else if (month && year && !groupId) {
-        const from = `${year}-${String(month).padStart(2, '0')}-01`
-        const lastDay = new Date(year, month, 0).getDate()
-        const to = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
-        query = query.gte('date', from).lte('date', to)
-      }
-      if (category && category !== 'all') {
-        query = query.eq('category', category)
-      }
-      if (type && type !== 'all') {
-        query = query.eq('type', type)
-      }
-      if (search) {
-        query = query.ilike('description', `%${search}%`)
-      }
+      query = storageService.applyTransactionFilters(query, filters)
 
       const from = (page - 1) * pageSize
       const to = from + pageSize - 1
@@ -48,6 +57,43 @@ export const storageService = {
 
       const { data, error, count } = await query
       return { data, error, count }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  // Totals across EVERY row the current filters match, not just the visible
+  // page. Aggregated client-side like the dashboard summaries; the explicit
+  // range lifts PostgREST's default row cap for a busy year.
+  getTransactionTotals: async (filters) => {
+    try {
+      let query = supabase.from('transactions').select('amount, type, group_id')
+      query = storageService.applyTransactionFilters(query, filters).range(0, 9999)
+
+      const { data, error } = await query
+      if (error || !data) return { data: null, error }
+
+      const sumType = (t) =>
+        data.filter((r) => r.type === t).reduce((s, r) => s + parseFloat(r.amount), 0)
+
+      const income = sumType('income')
+      const expenses = sumType('expense')
+      const grouped = data.filter((r) => r.group_id)
+
+      return {
+        data: {
+          count: data.length,
+          income,
+          expenses,
+          transfers: sumType('transfer'),
+          net: income - expenses,
+          groupedCount: grouped.length,
+          groupedExpenses: grouped
+            .filter((r) => r.type === 'expense')
+            .reduce((s, r) => s + parseFloat(r.amount), 0),
+        },
+        error: null,
+      }
     } catch (err) {
       return { data: null, error: err }
     }

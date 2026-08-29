@@ -106,6 +106,7 @@ function Workspace({ user, profile }) {
                 accountCanWrite={canWrite}
                 month={month}
                 year={year}
+                viewMode={viewMode}
                 groups={groups}
               />
             )}

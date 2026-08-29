@@ -57,7 +57,11 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
 - The Dashboard has a month/year `viewMode` (state in App.jsx, toggle in TopBar).
   Year mode swaps `getMonthlySummary`→`getYearlySummary` and
   `DailyTrend`→`MonthlyTrend`; summary cards / spending chart / recent list are
-  reused unchanged. Transactions and group views stay month-scoped
+  reused unchanged. Transactions honours the SAME toggle (year mode widens the
+  query to Jan 1–Dec 31 via `applyTransactionFilters`) and shows a condensed
+  `PeriodSummary` strip. Unlike the dashboard that strip totals exactly what the
+  list shows — active filters applied, grouped rows included — and says so.
+  Group views ignore the toggle: they stay all-time
 - Currency formatting and amount parsing live only in `src/utils/format.js`
   (`formatCurrency`, `parseAmount`) — never inline `Intl.NumberFormat`
 - Date-only values from imports are normalized with `toISODate` in
