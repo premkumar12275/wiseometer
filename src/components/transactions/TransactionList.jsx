@@ -12,7 +12,7 @@ import ImportWizard from '../import/ImportWizard'
 import ShareGroupModal from '../groups/ShareGroupModal'
 import { Trash2, Pencil, Plus, Receipt, ChevronLeft, ChevronRight, Download, Upload, Tag, Users } from 'lucide-react'
 
-const PAGE_SIZE = 20
+const PAGE_SIZES = [20, 40, 50, 100]
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']
@@ -68,6 +68,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
     dateTo: '',
   })
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
   const [showForm, setShowForm] = useState(false)   // add-only; edits happen inline
   const [editingId, setEditingId] = useState(null)  // id of the row being edited in place
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -99,6 +100,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
     dateTo: filters.dateTo,
     groupId: group?.id,
     page,
+    pageSize,
   })
 
   // Running totals for the group header (all-time, independent of the page).
@@ -107,7 +109,7 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
     storageService.getGroupSummary(group.id).then(({ data }) => setGroupSummary(data))
   }, [group, tick])
 
-  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(count / pageSize))
 
   // Keep the page in range when deletions shrink the result set.
   useEffect(() => {
@@ -124,6 +126,10 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
   const clearSelection = () => setSelectedIds(new Set())
   const goToPage = (p) => { clearSelection(); setPage(p) }
   const onFiltersChange = (f) => { clearSelection(); setFilters(f); setPage(1) }
+
+  // Changing the page size reshuffles what lands on which page, so go back to
+  // the first one rather than leaving the user on a page that moved.
+  const onPageSizeChange = (size) => { clearSelection(); setPageSize(size); setPage(1) }
 
   const toggleSelect = (id) =>
     setSelectedIds((prev) => {
@@ -366,27 +372,48 @@ export default function TransactionList({ user, profile, ownerId, accountCanWrit
           </div>
         )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#2a2d3a]">
-            <span className="text-xs text-gray-500">
-              Page {page} of {totalPages}
-            </span>
-            <div className="flex gap-1">
-              <button
-                onClick={() => goToPage(Math.max(1, page - 1))}
-                disabled={page === 1}
-                className="p-1.5 rounded text-gray-500 hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+        {/* Pagination — the page-size picker stays available even when
+            everything already fits on one page. */}
+        {!loading && transactions.length > 0 && (
+          <div className="flex items-center justify-between gap-4 px-4 py-3 border-t border-[#2a2d3a]">
+            <label className="flex items-center gap-2 text-xs text-gray-500">
+              Rows per page
+              <select
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                className="bg-[#1f2233] border border-[#2a2d3a] rounded px-1.5 py-1 text-xs text-gray-300 outline-none focus:border-teal-400 cursor-pointer"
               >
-                <ChevronLeft size={14} />
-              </button>
-              <button
-                onClick={() => goToPage(Math.min(totalPages, page + 1))}
-                disabled={page === totalPages}
-                className="p-1.5 rounded text-gray-500 hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <ChevronRight size={14} />
-              </button>
+                {PAGE_SIZES.map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">
+                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, count)} of {count}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => goToPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    className="p-1.5 rounded text-gray-500 hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-xs text-gray-500 self-center">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => goToPage(Math.min(totalPages, page + 1))}
+                    disabled={page === totalPages}
+                    className="p-1.5 rounded text-gray-500 hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

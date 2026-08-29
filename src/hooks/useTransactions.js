@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { storageService } from '../services/storageService'
 
-export function useTransactions({ userId, month, year, viewMode, category, type, search, dateFrom, dateTo, groupId, page }) {
+export function useTransactions({ userId, month, year, viewMode, category, type, search, dateFrom, dateTo, groupId, page, pageSize }) {
   const [transactions, setTransactions] = useState([])
   const [count, setCount] = useState(0)
   const [totals, setTotals] = useState(null)
@@ -19,7 +19,7 @@ export function useTransactions({ userId, month, year, viewMode, category, type,
     // The page of rows and the totals for the whole filtered set are independent
     // queries over the same filters — fetched together so they never disagree.
     const [list, summary] = await Promise.all([
-      storageService.getTransactions({ ...filters, page }),
+      storageService.getTransactions({ ...filters, page, pageSize }),
       storageService.getTransactionTotals(filters),
     ])
 
@@ -31,7 +31,7 @@ export function useTransactions({ userId, month, year, viewMode, category, type,
     }
     setTotals(summary.data || null)
     if (!silent) setLoading(false)
-  }, [userId, month, year, viewMode, category, type, search, dateFrom, dateTo, groupId, page])
+  }, [userId, month, year, viewMode, category, type, search, dateFrom, dateTo, groupId, page, pageSize])
 
   useEffect(() => {
     fetchTransactions()
