@@ -149,6 +149,18 @@ alter table statement_imports enable row level security;
 -- Investments: a separate portfolio ledger (stocks, funds, crypto, real
 -- estate, bonds, other), independent of the transactions/expense tracking.
 -- Valuation is manual — no market-data API. No group concept.
+-- Named container holding several investments (down payment, EMI, renovation),
+-- the investments answer to `groups`. target_amount is what progress is
+-- measured against — e.g. the full price of the house.
+create table investment_folders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  name text not null,
+  target_amount numeric(14,2),
+  notes text,
+  created_at timestamptz default now()
+);
+
 create table investments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -158,15 +170,40 @@ create table investments (
   quantity numeric(14,4),
   amount_invested numeric(12,2) not null,
   current_value numeric(12,2) not null,
-  purchase_date date not null,
+  purchase_date date not null,          -- also the start date of a recurring plan
   notes text,
+  folder_id uuid references investment_folders(id) on delete set null,
+  -- Recurring contribution plan (e.g. a monthly house EMI). When is_recurring,
+  -- the amount paid so far is DERIVED from the schedule in app code and
+  -- amount_invested only holds a snapshot of it.
+  is_recurring boolean not null default false,
+  frequency text check (frequency in ('monthly','quarterly','yearly')),
+  contribution_amount numeric(12,2),
+  is_ongoing boolean not null default true,
+  end_date date,
   source text check (source in ('manual','import')) default 'manual',
   created_at timestamptz default now()
 );
+
+-- "From this date the contribution is X." Periods before a change keep the
+-- older amount, so a rate reset doesn't rewrite history.
+create table investment_contribution_changes (
+  id uuid primary key default gen_random_uuid(),
+  investment_id uuid references investments(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
+  effective_from date not null,
+  amount numeric(12,2) not null,
+  note text,
+  created_at timestamptz default now()
+);
+create index investment_contribution_changes_investment_idx
+  on investment_contribution_changes (investment_id, effective_from);
 create index investments_user on investments(user_id);
 
 alter table investments enable row level security;
--- Policies for investments are defined in the "Sharing" section below.
+alter table investment_folders enable row level security;
+alter table investment_contribution_changes enable row level security;
+-- Policies for all three are defined in the "Sharing" section below.
 
 -- ── Sharing (group + account) ────────────────────────────────────────────────
 -- See docs/sharing-design.md. Account-level sharing (Phase 2) will replace the
@@ -403,4 +440,14 @@ create policy imports_write on statement_imports for all
 -- investments (account-scoped, no group concept)
 create policy inv_select on investments for select using (can_read_account(user_id));
 create policy inv_write on investments for all
+  using (can_write_account(user_id)) with check (can_write_account(user_id));
+
+-- investment folders + contribution changes (account-scoped)
+create policy inv_folder_select on investment_folders for select using (can_read_account(user_id));
+create policy inv_folder_write on investment_folders for all
+  using (can_write_account(user_id)) with check (can_write_account(user_id));
+
+create policy inv_change_select on investment_contribution_changes for select
+  using (can_read_account(user_id));
+create policy inv_change_write on investment_contribution_changes for all
   using (can_write_account(user_id)) with check (can_write_account(user_id));

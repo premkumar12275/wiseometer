@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { storageService } from '../services/storageService'
 
-// Loads the active account's investment portfolio — the full list plus
-// top-line totals, in one query (there's no pagination/filtering for
-// investments, unlike transactions).
+// Loads the active account's investment portfolio — every investment (each
+// already carrying its derived "paid so far"), the folders they sit in, and
+// the top-line totals. No pagination or filtering, unlike transactions.
 export function useInvestments(ownerId) {
   const [investments, setInvestments] = useState([])
+  const [folders, setFolders] = useState([])
   const [invested, setInvested] = useState(0)
   const [currentValue, setCurrentValue] = useState(0)
   const [gainLoss, setGainLoss] = useState(0)
@@ -13,10 +14,11 @@ export function useInvestments(ownerId) {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    if (!ownerId) { setInvestments([]); setLoading(false); return }
+    if (!ownerId) { setInvestments([]); setFolders([]); setLoading(false); return }
     setLoading(true)
     const { data } = await storageService.getInvestmentsSummary(ownerId)
     setInvestments(data?.investments || [])
+    setFolders(data?.folders || [])
     setInvested(data?.invested || 0)
     setCurrentValue(data?.currentValue || 0)
     setGainLoss(data?.gainLoss || 0)
@@ -26,5 +28,5 @@ export function useInvestments(ownerId) {
 
   useEffect(() => { load() }, [load])
 
-  return { investments, invested, currentValue, gainLoss, gainLossPct, loading, refetch: load }
+  return { investments, folders, invested, currentValue, gainLoss, gainLossPct, loading, refetch: load }
 }

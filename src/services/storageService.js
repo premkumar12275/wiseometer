@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { investedAmount, planProgress } from '../utils/investmentPlan'
 
 export const storageService = {
   // ─── Transactions ───────────────────────────────────────────────────────────
@@ -653,26 +654,116 @@ export const storageService = {
 
   // ─── Investments ────────────────────────────────────────────────────────────
 
+  // Investments, their folders, and every contribution change — three small
+  // queries, because a recurring plan's "paid so far" is derived from its
+  // schedule at read time rather than read off the row.
   getInvestmentsSummary: async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('investments')
-        .select('*')
-        .eq('user_id', userId)
-        .order('purchase_date', { ascending: false })
-      if (error || !data) return { data: null, error }
+      const [list, changeRows, folderRows] = await Promise.all([
+        supabase.from('investments').select('*').eq('user_id', userId)
+          .order('purchase_date', { ascending: false }),
+        supabase.from('investment_contribution_changes').select('*').eq('user_id', userId)
+          .order('effective_from', { ascending: true }),
+        supabase.from('investment_folders').select('*').eq('user_id', userId)
+          .order('created_at', { ascending: true }),
+      ])
+      if (list.error || !list.data) return { data: null, error: list.error }
 
-      const invested = data.reduce((sum, i) => sum + parseFloat(i.amount_invested), 0)
-      const currentValue = data.reduce((sum, i) => sum + parseFloat(i.current_value), 0)
+      const changesByInvestment = (changeRows.data || []).reduce((acc, c) => {
+        (acc[c.investment_id] ||= []).push(c)
+        return acc
+      }, {})
+
+      // Every row carries its derived figures so no screen has to recompute or,
+      // worse, fall back to the stored snapshot.
+      const investments = list.data.map((inv) => {
+        const changes = changesByInvestment[inv.id] || []
+        const progress = planProgress(inv, changes)
+        return {
+          ...inv,
+          changes,
+          invested: investedAmount(inv, changes),
+          progress: inv.is_recurring ? progress : null,
+        }
+      })
+
+      const invested = investments.reduce((sum, i) => sum + i.invested, 0)
+      const currentValue = investments.reduce((sum, i) => sum + parseFloat(i.current_value), 0)
       const gainLoss = currentValue - invested
       const gainLossPct = invested > 0 ? (gainLoss / invested) * 100 : 0
 
       return {
-        data: { invested, currentValue, gainLoss, gainLossPct, investments: data },
+        data: {
+          invested,
+          currentValue,
+          gainLoss,
+          gainLossPct,
+          investments,
+          folders: folderRows.data || [],
+        },
         error: null,
       }
     } catch (err) {
       return { data: null, error: err }
+    }
+  },
+
+  // ─── Investment folders ─────────────────────────────────────────────────────
+
+  saveInvestmentFolder: async (folder) => {
+    try {
+      const { data, error } = await supabase
+        .from('investment_folders').insert([folder]).select().single()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  updateInvestmentFolder: async (id, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('investment_folders').update(updates).eq('id', id).select().single()
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
+  // The investments survive — folder_id is nulled by the FK, so they reappear
+  // under Ungrouped rather than being deleted with the folder.
+  deleteInvestmentFolder: async (id) => {
+    try {
+      const { error } = await supabase.from('investment_folders').delete().eq('id', id)
+      return { error }
+    } catch (err) {
+      return { error: err }
+    }
+  },
+
+  // ─── Contribution changes ───────────────────────────────────────────────────
+
+  // Replaces the whole schedule for one investment: simpler and less
+  // error-prone than diffing rows, and a schedule is only ever a handful long.
+  replaceInvestmentChanges: async (investmentId, userId, changes) => {
+    try {
+      const { error: delErr } = await supabase
+        .from('investment_contribution_changes').delete().eq('investment_id', investmentId)
+      if (delErr) return { error: delErr }
+      if (changes.length === 0) return { error: null }
+
+      const { error } = await supabase.from('investment_contribution_changes').insert(
+        changes.map((c) => ({
+          investment_id: investmentId,
+          user_id: userId,
+          effective_from: c.effective_from,
+          amount: c.amount,
+          note: c.note || null,
+        }))
+      )
+      return { error }
+    } catch (err) {
+      return { error: err }
     }
   },
 

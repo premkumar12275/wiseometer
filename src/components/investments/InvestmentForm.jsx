@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { INVESTMENT_TYPES } from '../../constants/investmentTypes'
 import { storageService } from '../../services/storageService'
+import { formatCurrency } from '../../utils/format'
+import { FREQUENCIES, planProgress } from '../../utils/investmentPlan'
+import ContributionScheduleEditor from './ContributionScheduleEditor'
 import { X } from 'lucide-react'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -14,9 +17,15 @@ const EMPTY = {
   amountInvested: '',
   currentValue: '',
   notes: '',
+  folderId: '',
+  isRecurring: false,
+  frequency: 'monthly',
+  contributionAmount: '',
+  isOngoing: true,
+  endDate: '',
 }
 
-export default function InvestmentForm({ user, ownerId, investment, onSaved, onClose }) {
+export default function InvestmentForm({ user, ownerId, investment, folders = [], defaultFolderId, onSaved, onClose }) {
   const [form, setForm] = useState(investment ? {
     type: investment.type,
     name: investment.name,
@@ -26,9 +35,35 @@ export default function InvestmentForm({ user, ownerId, investment, onSaved, onC
     amountInvested: String(investment.amount_invested),
     currentValue: String(investment.current_value),
     notes: investment.notes || '',
-  } : EMPTY)
+    folderId: investment.folder_id || '',
+    isRecurring: !!investment.is_recurring,
+    frequency: investment.frequency || 'monthly',
+    contributionAmount: investment.contribution_amount != null ? String(investment.contribution_amount) : '',
+    isOngoing: investment.is_ongoing !== false,
+    endDate: investment.end_date || '',
+  } : { ...EMPTY, folderId: defaultFolderId || '' })
+  const [changes, setChanges] = useState(
+    (investment?.changes || []).map((c) => ({ effective_from: c.effective_from, amount: String(c.amount) }))
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Live preview of what the plan has cost so far, computed with the same code
+  // the rest of the app uses — the form can't promise a different number.
+  const preview = useMemo(() => planProgress(
+    {
+      is_recurring: form.isRecurring,
+      purchase_date: form.purchaseDate,
+      frequency: form.frequency,
+      contribution_amount: parseFloat(form.contributionAmount) || 0,
+      is_ongoing: form.isOngoing,
+      end_date: form.endDate || null,
+    },
+    changes
+      .filter((c) => c.effective_from && c.amount !== '')
+      .map((c) => ({ effective_from: c.effective_from, amount: parseFloat(c.amount) }))
+  ), [form.isRecurring, form.purchaseDate, form.frequency, form.contributionAmount,
+      form.isOngoing, form.endDate, changes])
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -44,18 +79,47 @@ export default function InvestmentForm({ user, ownerId, investment, onSaved, onC
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    const amountInvested = parseFloat(form.amountInvested)
-    if (isNaN(amountInvested) || amountInvested <= 0) {
-      setError('Amount invested must be a positive number.')
-      return
-    }
-    const currentValue = parseFloat(form.currentValue)
-    if (isNaN(currentValue) || currentValue < 0) {
-      setError('Current value must be a non-negative number.')
-      return
-    }
+
     if (!form.name.trim()) {
       setError('Name is required.')
+      return
+    }
+
+    // A recurring plan's invested total is derived from its schedule; a one-off
+    // purchase carries the figure the user typed.
+    let amountInvested
+    if (form.isRecurring) {
+      const contribution = parseFloat(form.contributionAmount)
+      if (isNaN(contribution) || contribution <= 0) {
+        setError('Contribution amount must be a positive number.')
+        return
+      }
+      const bad = changes.find(
+        (c) => !c.effective_from || c.amount === '' || isNaN(parseFloat(c.amount)) || parseFloat(c.amount) < 0
+      )
+      if (bad) {
+        setError('Every contribution change needs a date and a non-negative amount.')
+        return
+      }
+      if (!form.isOngoing && form.endDate && form.endDate < form.purchaseDate) {
+        setError('End date cannot be before the start date.')
+        return
+      }
+      amountInvested = preview.invested
+    } else {
+      amountInvested = parseFloat(form.amountInvested)
+      if (isNaN(amountInvested) || amountInvested <= 0) {
+        setError('Amount invested must be a positive number.')
+        return
+      }
+    }
+
+    // A plan with no separate valuation is worth what has gone into it.
+    const currentValue = form.isRecurring && form.currentValue === ''
+      ? amountInvested
+      : parseFloat(form.currentValue)
+    if (isNaN(currentValue) || currentValue < 0) {
+      setError('Current value must be a non-negative number.')
       return
     }
     setLoading(true)
@@ -67,21 +131,49 @@ export default function InvestmentForm({ user, ownerId, investment, onSaved, onC
       symbol: form.symbol.trim() || null,
       quantity: form.quantity !== '' ? parseFloat(form.quantity) : null,
       purchase_date: form.purchaseDate,
+      // For a recurring plan this is only a snapshot — every screen recomputes
+      // the real figure from the schedule.
       amount_invested: amountInvested,
       current_value: currentValue,
       notes: form.notes.trim() || null,
+      folder_id: form.folderId || null,
+      is_recurring: form.isRecurring,
+      frequency: form.isRecurring ? form.frequency : null,
+      contribution_amount: form.isRecurring ? parseFloat(form.contributionAmount) : null,
+      is_ongoing: form.isRecurring ? form.isOngoing : true,
+      end_date: form.isRecurring && !form.isOngoing && form.endDate ? form.endDate : null,
     }
 
-    let result
-    if (investment) {
-      result = await storageService.updateInvestment(investment.id, payload)
-    } else {
-      result = await storageService.saveInvestment({ ...payload, source: 'manual' })
+    const result = investment
+      ? await storageService.updateInvestment(investment.id, payload)
+      : await storageService.saveInvestment({ ...payload, source: 'manual' })
+
+    if (result.error) {
+      setError(result.error.message)
+      setLoading(false)
+      return
     }
 
-    if (result.error) setError(result.error.message)
-    else onSaved()
+    // The schedule is stored against the row's id, which only exists once the
+    // investment itself has been written.
+    const id = result.data?.id || investment?.id
+    if (id) {
+      const { error: scheduleErr } = await storageService.replaceInvestmentChanges(
+        id,
+        ownerId || user.id,
+        form.isRecurring
+          ? changes.map((c) => ({ effective_from: c.effective_from, amount: parseFloat(c.amount) }))
+          : []
+      )
+      if (scheduleErr) {
+        setError(`Investment saved, but its schedule failed: ${scheduleErr.message}`)
+        setLoading(false)
+        return
+      }
+    }
+
     setLoading(false)
+    onSaved()
   }
 
   useEffect(() => {
@@ -163,9 +255,28 @@ export default function InvestmentForm({ user, ownerId, investment, onSaved, onC
             />
           </div>
 
-          {/* Purchase date */}
+          {/* Folder */}
+          {folders.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
+                Folder <span className="text-gray-600 normal-case">(optional)</span>
+              </label>
+              <select
+                className="input-field"
+                value={form.folderId}
+                onChange={(e) => set('folderId', e.target.value)}
+              >
+                <option value="">Ungrouped</option>
+                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Purchase / start date */}
           <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Purchase Date</label>
+            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
+              {form.isRecurring ? 'Start Date' : 'Purchase Date'}
+            </label>
             <input
               type="date"
               className="input-field"
@@ -175,20 +286,111 @@ export default function InvestmentForm({ user, ownerId, investment, onSaved, onC
             />
           </div>
 
-          {/* Amount invested */}
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Amount Invested</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              className="input-field amount-font"
-              placeholder="0.00"
-              value={form.amountInvested}
-              onChange={(e) => handleAmountInvestedChange(e.target.value)}
-              required
-            />
+          {/* Recurring plan */}
+          <div className="rounded-lg border border-[#2a2d3a] p-3 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                checked={form.isRecurring}
+                onChange={(e) => set('isRecurring', e.target.checked)}
+                className="w-3.5 h-3.5 accent-teal-400 cursor-pointer"
+              />
+              <span className={`text-xs font-medium uppercase tracking-wide ${form.isRecurring ? 'text-gray-300' : 'text-gray-500'}`}>
+                Recurring contribution
+              </span>
+            </label>
+            <p className="text-[11px] text-gray-600 -mt-1.5">
+              For an EMI or a standing top-up. The amount paid grows on its own each period.
+            </p>
+
+            {form.isRecurring && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Frequency</label>
+                    <select
+                      className="input-field"
+                      value={form.frequency}
+                      onChange={(e) => set('frequency', e.target.value)}
+                    >
+                      {FREQUENCIES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      className="input-field amount-font"
+                      placeholder="e.g. 18500"
+                      value={form.contributionAmount}
+                      onChange={(e) => set('contributionAmount', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                  <input
+                    type="checkbox"
+                    checked={form.isOngoing}
+                    onChange={(e) => set('isOngoing', e.target.checked)}
+                    className="w-3.5 h-3.5 accent-teal-400 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-400">Ongoing</span>
+                </label>
+
+                {!form.isOngoing && (
+                  <div>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Ended on</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      min={form.purchaseDate}
+                      value={form.endDate}
+                      onChange={(e) => set('endDate', e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <ContributionScheduleEditor
+                  startDate={form.purchaseDate}
+                  baseAmount={parseFloat(form.contributionAmount) || 0}
+                  frequency={form.frequency}
+                  changes={changes}
+                  onChange={setChanges}
+                />
+
+                <div className="rounded-lg bg-[#1a1d27] px-3 py-2.5">
+                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">Paid so far</p>
+                  <p className="amount-font text-base font-semibold text-white">
+                    {formatCurrency(preview.invested)}
+                  </p>
+                  <p className="text-[11px] text-gray-600 mt-0.5">
+                    {preview.periods} payment{preview.periods !== 1 ? 's' : ''}
+                    {preview.nextDueDate && ` · next on ${preview.nextDueDate}`}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Amount invested — derived for a recurring plan */}
+          {!form.isRecurring && (
+            <div>
+              <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Amount Invested</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                className="input-field amount-font"
+                placeholder="0.00"
+                value={form.amountInvested}
+                onChange={(e) => handleAmountInvestedChange(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
           {/* Current value */}
           <div>
@@ -201,8 +403,13 @@ export default function InvestmentForm({ user, ownerId, investment, onSaved, onC
               placeholder="0.00"
               value={form.currentValue}
               onChange={(e) => set('currentValue', e.target.value)}
-              required
+              required={!form.isRecurring}
             />
+            {form.isRecurring && (
+              <p className="text-[11px] text-gray-600 mt-1.5">
+                Leave blank to value the plan at what has been paid into it.
+              </p>
+            )}
           </div>
 
           {/* Notes */}

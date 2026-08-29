@@ -43,9 +43,23 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
   from the `get_transaction_tags(owner)` RPC via `useTransactionTags`;
   `src/components/common/TagInput.jsx` is the shared chip input for both surfaces
 - Investments are a SEPARATE portfolio ledger (`investments` table) — no link to
-  transactions or cash flow, and no group concept. Valuation is MANUAL
+  transactions or cash flow. Valuation is MANUAL
   (`amount_invested` vs `current_value`); gain/loss is derived, never fetched from a
-  market API. Types are a FIXED list in `src/constants/investmentTypes.js` whose ids
+  market API.
+- Investments have their OWN folders (`investment_folders`, unrelated to transaction
+  `groups`): a named container like "House investment 1" holding the down payment,
+  the loan EMI and the renovation, with an optional `target_amount` to show progress
+  against. Deleting a folder keeps its investments (they fall back to Ungrouped)
+- An investment can be a RECURRING plan (`is_recurring` + `frequency` +
+  `contribution_amount`, starting at `purchase_date`, capped by `is_ongoing`/
+  `end_date`). Its paid-so-far total is DERIVED at read time by
+  `src/utils/investmentPlan.js` (`planProgress`/`investedAmount`), never read off
+  `amount_invested` — that column only holds a snapshot, and the derived figure is
+  what grows as periods pass with nothing writing to the row. EMI changes live in
+  `investment_contribution_changes` ("from this date the amount is X"); periods
+  before a change keep the older amount so a rate reset can't rewrite history.
+  `getInvestmentsSummary` attaches `invested`, `progress` and `changes` to every
+  row — read those, never recompute in a component Types are a FIXED list in `src/constants/investmentTypes.js` whose ids
   must match the `investments.type` check constraint — adding one needs a migration.
   Own sidebar page + a Dashboard summary card that is NOT month-scoped. Import
   mirrors the transaction wizard but is Excel-only, under `components/investments/`
