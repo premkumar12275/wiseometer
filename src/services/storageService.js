@@ -729,6 +729,21 @@ export const storageService = {
 
   // ─── Investment folders ─────────────────────────────────────────────────────
 
+  // Folders alone — the sidebar needs the list without paying for the whole
+  // portfolio on every page.
+  getInvestmentFolders: async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('investment_folders')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+      return { data, error }
+    } catch (err) {
+      return { data: null, error: err }
+    }
+  },
+
   saveInvestmentFolder: async (folder) => {
     try {
       const { data, error } = await supabase

@@ -49,7 +49,13 @@ Stack: Vite + React 18, Supabase (PostgreSQL + Auth + Storage), Tailwind CSS, Re
 - Investments have their OWN folders (`investment_folders`, unrelated to transaction
   `groups`): a named container like "House investment 1" holding the down payment,
   the loan EMI and the renovation, with an optional `target_amount` to show progress
-  against. Deleting a folder keeps its investments (they fall back to Ungrouped)
+  against. Deleting a folder keeps its investments (they fall back to Ungrouped).
+  The sidebar's Investments item expands to list them (`useInvestmentFolders` — a
+  folders-only query, since it runs on every page; call `onFoldersChanged` after any
+  folder write so it refreshes). Clicking one opens `page: 'investment-folder'` →
+  `InvestmentFolderDetail`: summary on top, its investments below, where a recurring
+  plan expands to its period-by-period schedule. `InvestmentRow` is shared by that
+  page and the main list
 - An investment can be a RECURRING plan (`is_recurring` + `frequency` +
   `contribution_amount`, starting at `purchase_date`, capped by `is_ongoing`/
   `end_date`). Its paid-so-far total is DERIVED at read time by

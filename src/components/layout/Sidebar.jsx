@@ -15,12 +15,16 @@ import {
   History,
   PiggyBank,
   BarChart3,
+  Folder,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
 import { version } from '../../../package.json'
 import { authService } from '../../services/authService'
 import AccountSwitcher from '../account/AccountSwitcher'
 import ChangelogModal from './ChangelogModal'
 
+// Investments is rendered separately below — it expands to list its folders.
 const NAV_ITEMS = [
   { id: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions',  icon: List },
@@ -28,7 +32,6 @@ const NAV_ITEMS = [
   { id: 'import',       label: 'Import',        icon: Upload },
   { id: 'categories',   label: 'Categories',    icon: Shapes },
   { id: 'activity',     label: 'Activity',      icon: History },
-  { id: 'investments',  label: 'Investments',   icon: PiggyBank },
 ]
 
 export default function Sidebar({
@@ -42,8 +45,13 @@ export default function Sidebar({
   user,
   profile,
   onSwitchAccount,
+  investmentFolders = [],
+  activeInvestmentFolderId,
+  onSelectInvestmentFolder,
 }) {
   const [collapsed, setCollapsed] = useState(false)
+  // Expanded by default once folders exist, so they're discoverable.
+  const [investmentsOpen, setInvestmentsOpen] = useState(true)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [showChangelog, setShowChangelog] = useState(false)
@@ -102,6 +110,59 @@ export default function Sidebar({
             </button>
           )
         })}
+
+        {/* Investments — expands to its folders */}
+        <div>
+          <div
+            className={`
+              w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+              transition-colors duration-150
+              ${currentPage === 'investments' || currentPage === 'investment-folder'
+                ? 'bg-teal-400/10 text-teal-400'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-[#1f2233]'}
+              ${collapsed ? 'justify-center' : ''}
+            `}
+          >
+            <button
+              onClick={() => onNavigate('investments')}
+              title={collapsed ? 'Investments' : undefined}
+              className={`flex items-center gap-3 cursor-pointer ${collapsed ? '' : 'flex-1 min-w-0'}`}
+            >
+              <PiggyBank size={18} className="flex-shrink-0" />
+              {!collapsed && <span className="truncate">Investments</span>}
+            </button>
+            {!collapsed && investmentFolders.length > 0 && (
+              <button
+                onClick={() => setInvestmentsOpen((o) => !o)}
+                aria-label={investmentsOpen ? 'Collapse folders' : 'Expand folders'}
+                className="text-gray-600 hover:text-gray-300 transition-colors cursor-pointer flex-shrink-0"
+              >
+                {investmentsOpen ? <ChevronDown size={14} /> : <ChevronRightIcon size={14} />}
+              </button>
+            )}
+          </div>
+
+          {!collapsed && investmentsOpen && investmentFolders.map((f) => {
+            const active = currentPage === 'investment-folder' && activeInvestmentFolderId === f.id
+            return (
+              <button
+                key={f.id}
+                onClick={() => onSelectInvestmentFolder(f)}
+                title={f.name}
+                className={`
+                  w-full flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-lg text-sm
+                  transition-colors duration-150 cursor-pointer
+                  ${active
+                    ? 'bg-teal-400/10 text-teal-400'
+                    : 'text-gray-500 hover:text-gray-200 hover:bg-[#1f2233]'}
+                `}
+              >
+                <Folder size={14} className="flex-shrink-0" />
+                <span className="truncate">{f.name}</span>
+              </button>
+            )
+          })}
+        </div>
 
         {/* Groups */}
         <div className="pt-4">

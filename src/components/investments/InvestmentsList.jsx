@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useInvestments } from '../../hooks/useInvestments'
 import { storageService } from '../../services/storageService'
-import { getInvestmentTypeById } from '../../constants/investmentTypes'
 import { formatIn } from '../../utils/format'
-import { getFrequency } from '../../utils/investmentPlan'
+import ConfirmDelete from '../common/ConfirmDelete'
+import InvestmentRow from './InvestmentRow'
 import InvestmentForm from './InvestmentForm'
 import InvestmentFolderForm from './InvestmentFolderForm'
 import InvestmentImportWizard from './InvestmentImportWizard'
@@ -12,95 +12,7 @@ import {
   ChevronDown, ChevronRight, Repeat,
 } from 'lucide-react'
 
-function ConfirmDelete({ title, message, onConfirm, onCancel }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative card w-full max-w-sm p-6 fade-in">
-        <h3 className="text-base font-semibold text-white mb-2">{title}</h3>
-        <p className="text-sm text-gray-400 mb-5">{message}</p>
-        <div className="flex gap-2">
-          <button onClick={onCancel} className="btn-secondary flex-1 text-sm">Cancel</button>
-          <button onClick={onConfirm} className="btn-danger flex-1 text-sm">Delete</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InvestmentRow({ inv, onEdit, onDelete, canWrite }) {
-  const type = getInvestmentTypeById(inv.type)
-  // `invested` is derived for a recurring plan — never read amount_invested here.
-  const invested = inv.invested ?? parseFloat(inv.amount_invested)
-  const gain = parseFloat(inv.current_value) - invested
-  const gainPct = invested > 0 ? (gain / invested) * 100 : 0
-  const gainColor = gain >= 0 ? 'text-green-400' : 'text-red-400'
-  const freq = inv.is_recurring ? getFrequency(inv.frequency) : null
-  const fmt = (n) => formatIn(n, inv.currency)
-
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-[#1f2233] transition-colors rounded-lg group">
-      <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
-        style={{ backgroundColor: type.color + '22' }}
-      >
-        {type.emoji}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-200 font-medium truncate flex items-center gap-1.5">
-          {inv.name}
-          {inv.symbol && <span className="text-gray-500">· {inv.symbol}</span>}
-          {inv.is_recurring && (
-            <span
-              className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${
-                inv.is_ongoing ? 'bg-teal-400/10 text-teal-400' : 'bg-[#1f2233] text-gray-500'
-              }`}
-            >
-              <Repeat size={9} /> {inv.is_ongoing ? 'ongoing' : 'ended'}
-            </span>
-          )}
-        </p>
-        {inv.is_recurring ? (
-          <p className="text-xs text-gray-500">
-            <span className="amount-font">{fmt(inv.contribution_amount)}</span>{freq.per}
-            {' · '}{inv.progress?.periods ?? 0} payment{inv.progress?.periods !== 1 ? 's' : ''} since {inv.purchase_date}
-            {inv.changes?.length > 0 && ` · ${inv.changes.length} change${inv.changes.length !== 1 ? 's' : ''}`}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-500">
-            {inv.purchase_date} · {type.label}
-            {inv.quantity != null && ` · ${inv.quantity} units`}
-          </p>
-        )}
-      </div>
-
-      <div className="text-right flex-shrink-0">
-        <p className="amount-font text-sm font-semibold text-white">{fmt(inv.current_value)}</p>
-        {inv.is_recurring ? (
-          <p className="amount-font text-xs text-gray-500">{fmt(invested)} paid</p>
-        ) : (
-          <p className={`amount-font text-xs ${gainColor}`}>
-            {gain >= 0 ? '+' : ''}{fmt(gain)} ({gainPct >= 0 ? '+' : ''}{gainPct.toFixed(1)}%)
-          </p>
-        )}
-      </div>
-
-      {canWrite && (
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(inv)} className="p-1.5 rounded-md text-gray-500 hover:text-teal-400 hover:bg-teal-400/10 transition-colors cursor-pointer">
-            <Pencil size={13} />
-          </button>
-          <button onClick={() => onDelete(inv)} className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onDeleteFolder, onEdit, onDelete }) {
+function FolderSection({ folder, investments, canWrite, onAdd, onOpen, onEditFolder, onDeleteFolder, onEdit, onDelete }) {
   const [open, setOpen] = useState(true)
   // One total per currency — a folder can legitimately hold a NOK account and
   // an INR loan, and those must never be added together.
@@ -126,9 +38,17 @@ function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onD
             {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
           <Folder size={15} className={folder ? 'text-teal-400' : 'text-gray-600'} />
-          <h3 className="text-sm font-semibold text-white flex-1 truncate">
-            {folder ? folder.name : 'Ungrouped'}
-          </h3>
+          {folder ? (
+            <button
+              onClick={() => onOpen(folder)}
+              title="Open folder"
+              className="text-sm font-semibold text-white flex-1 truncate text-left hover:text-teal-400 transition-colors cursor-pointer"
+            >
+              {folder.name}
+            </button>
+          ) : (
+            <h3 className="text-sm font-semibold text-white flex-1 truncate">Ungrouped</h3>
+          )}
 
           <div className="text-xs text-gray-500 text-right">
             {totals.length === 0 ? '—' : totals.map((t) => (
@@ -203,7 +123,7 @@ function FolderSection({ folder, investments, canWrite, onAdd, onEditFolder, onD
   )
 }
 
-export default function InvestmentsList({ user, ownerId, canWrite = true }) {
+export default function InvestmentsList({ user, ownerId, canWrite = true, onFoldersChanged, onSelectFolder }) {
   const { investments, folders, currencies, loading, refetch } = useInvestments(ownerId)
   const [showForm, setShowForm] = useState(false)
   const [editInv, setEditInv] = useState(null)
@@ -225,6 +145,7 @@ export default function InvestmentsList({ user, ownerId, canWrite = true }) {
     setShowFolderForm(false)
     setEditFolder(null)
     refetch()
+    onFoldersChanged?.() // the sidebar keeps its own folder list
   }
 
   const confirmDelete = async () => {
@@ -237,6 +158,7 @@ export default function InvestmentsList({ user, ownerId, canWrite = true }) {
     await storageService.deleteInvestmentFolder(pendingFolderDelete.id)
     setPendingFolderDelete(null)
     refetch()
+    onFoldersChanged?.()
   }
 
   const openAdd = (folderId = '') => {
@@ -310,6 +232,7 @@ export default function InvestmentsList({ user, ownerId, canWrite = true }) {
               investments={investments.filter((i) => i.folder_id === folder.id)}
               canWrite={canWrite}
               onAdd={openAdd}
+              onOpen={onSelectFolder}
               onEditFolder={(f) => { setEditFolder(f); setShowFolderForm(true) }}
               onDeleteFolder={setPendingFolderDelete}
               onEdit={(i) => { setEditInv(i); setShowForm(true) }}
@@ -370,7 +293,6 @@ export default function InvestmentsList({ user, ownerId, canWrite = true }) {
       {pendingDelete && (
         <ConfirmDelete
           title={`Delete "${pendingDelete.name}"?`}
-          message="This action cannot be undone."
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}
         />

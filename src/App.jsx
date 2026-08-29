@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from './hooks/useAuth'
 import { useProfile } from './hooks/useProfile'
 import { useGroups } from './hooks/useGroups'
+import { useInvestmentFolders } from './hooks/useInvestmentFolders'
 import { CategoriesProvider } from './contexts/CategoriesContext'
 import { AccountProvider, useAccount } from './contexts/AccountContext'
 import AuthGate from './components/auth/AuthGate'
@@ -15,6 +16,7 @@ import ImportWizard from './components/import/ImportWizard'
 import CategoriesManager from './components/categories/CategoriesManager'
 import ActivityLog from './components/activity/ActivityLog'
 import ReportsPage from './components/reports/ReportsPage'
+import InvestmentFolderDetail from './components/investments/InvestmentFolderDetail'
 import InvestmentsList from './components/investments/InvestmentsList'
 
 function LoadingScreen() {
@@ -37,8 +39,10 @@ function ViewerNotice() {
 function Workspace({ user, profile }) {
   const { ownerId, canWrite, activeAccount, setActiveAccountId } = useAccount()
   const { groups, createGroup, deleteGroup } = useGroups(user, activeAccount)
+  const { folders: investmentFolders, refetch: refetchInvestmentFolders } = useInvestmentFolders(ownerId)
   const [page, setPage] = useState('dashboard')
   const [activeGroupId, setActiveGroupId] = useState(null)
+  const [activeInvestmentFolderId, setActiveInvestmentFolderId] = useState(null)
 
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -47,9 +51,21 @@ function Workspace({ user, profile }) {
 
   const activeGroup = groups.find((g) => g.id === activeGroupId)
 
-  const goToPage = (id) => { setActiveGroupId(null); setPage(id) }
-  const selectGroup = (g) => { setActiveGroupId(g.id); setPage('group') }
-  const switchAccount = (id) => { setActiveAccountId(id); setActiveGroupId(null); setPage('dashboard') }
+  const activeInvestmentFolder = investmentFolders.find((f) => f.id === activeInvestmentFolderId)
+
+  const goToPage = (id) => { setActiveGroupId(null); setActiveInvestmentFolderId(null); setPage(id) }
+  const selectGroup = (g) => { setActiveInvestmentFolderId(null); setActiveGroupId(g.id); setPage('group') }
+  const selectInvestmentFolder = (f) => {
+    setActiveGroupId(null)
+    setActiveInvestmentFolderId(f.id)
+    setPage('investment-folder')
+  }
+  const switchAccount = (id) => {
+    setActiveAccountId(id)
+    setActiveGroupId(null)
+    setActiveInvestmentFolderId(null)
+    setPage('dashboard')
+  }
   const handleDeleteGroup = async (id) => {
     await deleteGroup(id)
     setActiveGroupId(null)
@@ -70,12 +86,19 @@ function Workspace({ user, profile }) {
           user={user}
           profile={profile}
           onSwitchAccount={switchAccount}
+          investmentFolders={investmentFolders}
+          activeInvestmentFolderId={activeInvestmentFolderId}
+          onSelectInvestmentFolder={selectInvestmentFolder}
         />
 
         <div className="flex flex-col flex-1 overflow-hidden">
           <TopBar
             currentPage={page}
-            title={page === 'group' ? activeGroup?.name : undefined}
+            title={
+              page === 'group' ? activeGroup?.name
+              : page === 'investment-folder' ? activeInvestmentFolder?.name
+              : undefined
+            }
             month={month}
             year={year}
             viewMode={viewMode}
@@ -149,7 +172,27 @@ function Workspace({ user, profile }) {
             )}
             {page === 'categories' && <CategoriesManager canWrite={canWrite} />}
             {page === 'activity' && <ActivityLog key={ownerId} ownerId={ownerId} groups={groups} />}
-            {page === 'investments' && <InvestmentsList key={ownerId} user={user} ownerId={ownerId} canWrite={canWrite} />}
+            {page === 'investments' && (
+              <InvestmentsList
+                key={ownerId}
+                user={user}
+                ownerId={ownerId}
+                canWrite={canWrite}
+                onFoldersChanged={refetchInvestmentFolders}
+                onSelectFolder={selectInvestmentFolder}
+              />
+            )}
+            {page === 'investment-folder' && activeInvestmentFolderId && (
+              <InvestmentFolderDetail
+                key={activeInvestmentFolderId}
+                user={user}
+                ownerId={ownerId}
+                canWrite={canWrite}
+                folderId={activeInvestmentFolderId}
+                onFoldersChanged={refetchInvestmentFolders}
+                onDeleted={() => goToPage('investments')}
+              />
+            )}
           </main>
         </div>
       </div>
