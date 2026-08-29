@@ -22,13 +22,15 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
   const [showForm, setShowForm] = useState(false)
   const [editTx, setEditTx] = useState(null)
 
-  const fetchSummary = async () => {
-    setLoading(true)
+  // `silent` updates the figures in place after a save, instead of collapsing
+  // the whole dashboard back into skeletons.
+  const fetchSummary = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
     const { data } = viewMode === 'year'
       ? await storageService.getYearlySummary(ownerId, year)
       : await storageService.getMonthlySummary(ownerId, month, year)
     setSummary(data)
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
 
   // A portfolio snapshot isn't scoped to a month/year — fetched independently.
@@ -57,7 +59,7 @@ export default function Dashboard({ user, ownerId, canWrite = true, month, year,
   const handleSaved = () => {
     setShowForm(false)
     setEditTx(null)
-    fetchSummary()
+    fetchSummary({ silent: true })
     fetchGroupTotals()
   }
 
